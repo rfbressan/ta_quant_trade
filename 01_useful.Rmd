@@ -1,0 +1,180 @@
+---
+title: "01 - Useful datasets and links"
+author: "Rafael F. Bressan"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    toc: true
+    theme: cayman
+    highlight: github
+    css: "style.css"
+bibliography: "references.bib"
+link-citations: yes
+---
+
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  TeX: { 
+      equationNumbers: { 
+            autoNumber: "all",
+            formatNumber: function (n) {return n}
+      } 
+  }
+});
+</script>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## International trade datasets
+
+[Peter Schott](https://sompks4.github.io/sub_data.html)
+
+[NBER International Trade and Geography Data - Redding](http://www.princeton.edu/~reddings/NBER-trade-data.html)
+
+[WITS](https://wits.worldbank.org/)
+
+[COMTRADE](https://comtrade.un.org/data/)
+
+[OECD](https://stats.oecd.org/Index.aspx?DataSetCode=BTDIXE_I4)
+
+[TCdata360 World Bank](https://tcdata360.worldbank.org/)
+
+[Microdata WB](https://microdata.worldbank.org/index.php/catalog?sort_by=rank&sort_order=desc&sk=trade)
+
+[WTO](https://www.wto.org/english/res_e/res_e.htm)
+
+[CEPII](http://www.cepii.fr/CEPII/en/bdd_modele/bdd_modele.asp)
+
+[Atlas of Economic Complexity](https://atlas.cid.harvard.edu/)
+
+[The Observatory of Economic Complexity](https://oec.world/)
+
+[Comex Stat](http://comexstat.mdic.gov.br/pt/home)
+
+[Gravity Portal](https://www.usitc.gov/data/gravity/index.htm)
+
+[db.nomics](https://db.nomics.world/)
+
+[World Input Output Database](https://www.rug.nl/ggdc/valuechain/wiod/wiod-2016-release)
+
+## Authors to follow
+
+[Adao, Rodrigo](https://app.scholarsite.io/rodrigo-adao)
+
+[Antràs, Pol](https://scholar.harvard.edu/antras/home)
+
+[Arkolakis, Costas](https://arkolakis.com/)
+
+[Bernard, Andrew](https://www.andrewbbernard.com/)
+
+[Costinot, Arnaud](https://economics.mit.edu/faculty/costinot)
+
+[Dix-Carneiro, Rafael](https://sites.google.com/site/rafaeldixcarneiro/)
+
+[Donaldson, Dave](https://dave-donaldson.com/)
+
+[Feenstra, Robert](http://www.robertcfeenstra.com/)
+
+[Grossman, Gene](http://www.princeton.edu/~grossman/)
+
+[Helpman, Elhanan](https://scholar.harvard.edu/helpman/home)
+
+[Javorcik, Beata](https://users.ox.ac.uk/~econ0247/)
+
+[Jensen, J. Bradford](https://sites.google.com/view/jbradfordjensen/)
+
+[Kortum, Samuel](http://kortum.elisites.yale.edu/)
+
+[Melitz, Marc](https://scholar.harvard.edu/melitz)
+
+[Ornelas, Emanuel](https://sites.google.com/site/emanuelornelaseo/)
+
+[Pavcnik, Nina](https://sites.dartmouth.edu/npavcnik/)
+
+[Pessoa, João Paulo](https://sites.google.com/site/joaopaulocnpessoa/)
+
+[Redding, Stephen](https://www.princeton.edu/~reddings/)
+
+[Rodríguez-Clare, Andrés](https://andres.econ.berkeley.edu/)
+
+[Schott, Peter](http://faculty.som.yale.edu/peterschott/)
+
+[Trefler, Daniel](http://www-2.rotman.utoronto.ca/~dtrefler/)
+
+## Downloading and looking into WIOD data
+
+For the final course project we will use the WIOD table, [@timmer2015illustrated]. This table contains bilateral trade flows and underlying data, covering 43 countries, and a model for the rest of the world for the period 2000-2014. Data for 56 sectors are classified according to the International Standard Industrial Classification revision 4 (ISIC Rev. 4).
+
+Download the 2016 release of WIOD table from the link [above](https://www.rug.nl/ggdc/valuechain/wiod/wiod-2016-release). Let's import the R version into a folder called `input`. Once you have downloaded and unzip the contents, you will have a file called `WIOT2014_October16_ROW.RData` in your `input` folder.
+
+```{r loading-wiod, cache=TRUE}
+library(data.table)
+library(fst)
+
+load("input/WIOT2014_October16_ROW.RData")
+
+setnames(wiot, 
+         c("IndustryCode", "IndustryDescription", "Country", "RNr"),
+         c("ind_code", "ind_name", "out_country", "out_ind"))
+wiot[sample(5), .(ind_code, out_country, out_ind, AUS1, BRA4)]
+```
+
+```{r, cache=TRUE, warning=FALSE}
+id_vars <- c("out_country", "out_ind")
+wiot <- melt(wiot[, -c("ind_code", "ind_name", "Year")], 
+             id.vars = id_vars,
+             variable.name = "in_country",
+             variable.factor = FALSE)
+wiot[, `:=`(in_ind = sub("[[:alpha:]]+(\\d+)", "\\1", in_country),
+            in_country = sub("([[:alpha:]]+)\\d+", "\\1", in_country))]
+wiot[, in_ind := as.integer(in_ind)]
+setcolorder(wiot,
+            c("out_country", "out_ind", "in_country", "in_ind", "value"))
+wiot[sample(5), 1:5]
+```
+
+Let's check what are the countries included in the dataset. We can see from the code below we have 45 "coutries", but only 43 of them are really countries. `ROW` stands for Rest Of the World, while `TOT` is a "Total" column that came with the raw data and we should drop it.
+
+```{r}
+wiot[, unique(out_country)]
+```
+
+From previous data analysis (not shown here), we also know that industry #56 - Activities of extraterritorial organizations and bodies is comprised of all zeros and, all other industries with codes greater than 56 are related to the Total aggregation. We will drop all these observations.
+
+```{r, cache=TRUE}
+#' Drop industry U (56) since most countries do not expend anything on this
+wiot <- wiot[!(out_country %chin% c("TOT") 
+               | in_country %chin% c("TOT")
+               | out_ind > 55
+               | in_ind > 55)]
+```
+
+This is the _cleaned_ dataset we shall work through this series of classes, save it to a file for posterior loading.
+
+```{r save-wiot}
+write_fst(wiot, "output/wiot.fst")
+```
+
+Now we must get socio-economic data from this [link](https://dataverse.nl/api/access/datafile/199095). This data is fully compatible with WIOD, but comes in Microsoft Excel format. 
+
+```{r sea, cache=TRUE}
+library(openxlsx)
+wiod_sea <- as.data.table(
+  read.xlsx("input/WIOD_SEA_Nov16.xlsx", sheet = "DATA"))
+#' Employed population in thousands
+employed <- wiod_sea[variable == "EMP", by = "country",
+                     .(employed = sum(`2014`))]
+setnames(employed, 
+         c("country", "employed"), 
+         c("out_country", "employed_i"))
+#' ATTENTION: socio-economic data from WIOD does not include ROW! I will just
+#' input the employed in ROW having the same value as the sum of all countries!
+employed <- rbind(employed, list("ROW", employed[, sum(employed_i)]))
+#' Write employed to fst file
+write_fst(employed, "output/employed.fst")
+```
+
+## References
