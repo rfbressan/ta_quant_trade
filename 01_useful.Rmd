@@ -26,6 +26,8 @@ MathJax.Hub.Config({
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(reticulate)
+use_condaenv("conda-env")
 ```
 
 ## International trade datasets
@@ -68,7 +70,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 [Arkolakis, Costas](https://arkolakis.com/)
 
+[Atkin, David](https://www.mit.edu/~atkin/)
+
 [Bernard, Andrew](https://www.andrewbbernard.com/)
+
+[Caliendo, Lorenzo](https://sites.google.com/site/lorenzocaliendo/research/cdp)
 
 [Costinot, Arnaud](https://economics.mit.edu/faculty/costinot)
 
@@ -86,11 +92,15 @@ knitr::opts_chunk$set(echo = TRUE)
 
 [Jensen, J. Bradford](https://sites.google.com/view/jbradfordjensen/)
 
+[Khandelwal, Amit](https://akhandelwal8.github.io/research/)
+
 [Kortum, Samuel](http://kortum.elisites.yale.edu/)
 
 [Melitz, Marc](https://scholar.harvard.edu/melitz)
 
 [Ornelas, Emanuel](https://sites.google.com/site/emanuelornelaseo/)
+
+[Parro, Fernando](https://sites.google.com/site/fernandoparro1/)
 
 [Pavcnik, Nina](https://sites.dartmouth.edu/npavcnik/)
 
@@ -110,7 +120,7 @@ For the final course project we will use the WIOD table, [@timmer2015illustrated
 
 Download the 2016 release of WIOD table from the link [above](https://www.rug.nl/ggdc/valuechain/wiod/wiod-2016-release). Let's import the R version into a folder called `input`. Once you have downloaded and unzip the contents, you will have a file called `WIOT2014_October16_ROW.RData` in your `input` folder.
 
-```{r loading-wiod, cache=TRUE}
+```{r loading-wiod}
 library(data.table)
 library(fst)
 
@@ -122,7 +132,7 @@ setnames(wiot,
 wiot[sample(5), .(ind_code, out_country, out_ind, AUS1, BRA4)]
 ```
 
-```{r, cache=TRUE, warning=FALSE}
+```{r, warning=FALSE}
 id_vars <- c("out_country", "out_ind")
 wiot <- melt(wiot[, -c("ind_code", "ind_name", "Year")], 
              id.vars = id_vars,
@@ -144,7 +154,7 @@ wiot[, unique(out_country)]
 
 From previous data analysis (not shown here), we also know that industry #56 - Activities of extraterritorial organizations and bodies is comprised of all zeros and, all other industries with codes greater than 56 are related to the Total aggregation. We will drop all these observations.
 
-```{r, cache=TRUE}
+```{r}
 #' Drop industry U (56) since most countries do not expend anything on this
 wiot <- wiot[!(out_country %chin% c("TOT") 
                | in_country %chin% c("TOT")
@@ -156,11 +166,12 @@ This is the _cleaned_ dataset we shall work through this series of classes, save
 
 ```{r save-wiot}
 write_fst(wiot, "output/wiot.fst")
+write.csv(wiot, "output/wiot.csv") # For Python users
 ```
 
 Now we must get socio-economic data from this [link](https://dataverse.nl/api/access/datafile/199095). This data is fully compatible with WIOD, but comes in Microsoft Excel format. 
 
-```{r sea, cache=TRUE}
+```{r sea}
 library(openxlsx)
 wiod_sea <- as.data.table(
   read.xlsx("input/WIOD_SEA_Nov16.xlsx", sheet = "DATA"))
@@ -176,5 +187,34 @@ employed <- rbind(employed, list("ROW", employed[, sum(employed_i)]))
 #' Write employed to fst file
 write_fst(employed, "output/employed.fst")
 ```
+
+_What about Python?_
+
+```{python, eval=FALSE}
+import numpy as np
+import pandas as pd
+
+wiot = pd.read_csv("output/wiot.csv")
+
+wiod_sea = pd.read_excel("input/WIOD_SEA_Nov16.xlsx", sheet_name = "DATA",
+                         engine = "openpyxl")
+employed = (wiod_sea
+  .query("variable == 'EMP'")
+  .groupby('country')[2014]
+  .sum()
+  .reset_index()
+  .rename(columns={'country': 'out_country', 2014: 'employed_i'})
+)
+row = pd.DataFrame({'out_country': ['ROW'], 
+                    'employed_i': [employed['employed_i'].sum()]})
+employed = employed.append(row)
+```
+
+_What about Matlab?_
+
+You are on your own!
+
+Sorry `r knitr::asis_output("\U1F623")`
+
 
 ## References
