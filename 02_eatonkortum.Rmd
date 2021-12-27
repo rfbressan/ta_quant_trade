@@ -1,0 +1,245 @@
+---
+title: "02 - The Eaton and Kortum model"
+author: "Rafael F. Bressan"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    css: "style.css"
+bibliography: "references.bib"
+link-citations: yes
+---
+
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  TeX: { 
+      equationNumbers: { 
+            autoNumber: "all",
+            formatNumber: function (n) {return n}
+      } 
+  }
+});
+</script>
+
+## Theoretical Framework
+
+In this section we will briefly describe the theoretical model as in @costinot2012goods, which is based on @eaton2002technology. It consists of an economy with multiple-countries, multiple industries, and labor as the solely production factor. Intra-industry heterogeneity is allowed, as in @eaton2002technology, each good is available in many varieties.
+
+Consider a world economy comprising $i=1, \ldots, I$ countries and labor as the only factor of production. There are $k=1, \ldots, K$ industries or goods. Labor is perfectly mobile across industries and immobile across countries. We denote by $L_{i}$ and $w_{i}$ the number of workers and the wage in country $i$, respectively. 
+
+**Technology.** Each good $k$ may come in an infinite number of varieties indexed by $\omega \in \Omega$ We denote by $z_{i}^{k}(\omega)$ the number of units of the $\omega$ th variety of good $k$ that can be produced with one unit of labor in country $i$. Assume the following:
+
+**A1.** For all countries $i$, goods $k$, and their varieties $\omega$,  $z_{i}^{k}(\omega)$ is a random variable drawn independently for each triplet $(i, k, \omega)$ from a Fréchet distribution $F_{i}^{k}(\cdot)$ such that
+$$
+F_{i}^{k}(z)=\exp \left[-\left(z / z_{i}^{k}\right)^{-\theta}\right], \quad \text { for all } z \geq 0
+$$
+where $z_{i}^{k}>0$ and $\theta>1$.
+Technological differences across countries and industries only depend on **two parameters**, $z_{i}^{k}$ and $\theta$. We refer to $z_{i}^{k}$ as the _fundamental productivity_ of country $i$ in industry $k$ while $\theta$ is the _intra-industry heterogeneity_.
+
+**A2.** For each unit of good $k$ shipped from country $i$ to country $j$, only $1 / d_{i j}^{k} \leq 1$ units arrive, with $d_{i j}^{k}$ such that 
+
+$$
+\begin{cases}
+d_{i i}^{k}=1 \text{, and}\\ 
+d_{i l}^{k} \leq d_{i j}^{k} \cdot d_{j l}^{k} \text{, for any third country } l.
+\end{cases}
+$$
+
+**Market structure.** Markets are assumed to be perfectly competitive. Together with constant returns to scale in production, perfect competition implies the following:
+
+**A3.** In any country $j$, the price $p_{j}^{k}(\omega)$ paid by buyers of variety $\omega$ of good $k$ is
+$$
+p_{j}^{k}(\omega)=\min _{1 \leq i \leq I}\left[c_{i j}^{k}(\omega)\right]
+$$
+where $c_{i j}^{k}(\omega)=\left(d_{i j}^{k} \cdot w_{i}\right) / z_{i}^{k}(\omega)$ is the cost of producing and delivering one unit of this variety from country $i$ to country $j$.
+
+Buyers in country $j$ are "shopping around the world" for the best price available. In what follows, we let $c_{i j}^{k}=\left(d_{i j}^{k} \cdot w_{i}\right) / z_{i}^{k}>0$.
+
+**Preferences.** The upper tier utility function is Cobb-Douglas, while the lower tier is CES[^ds]. Accordingly, expenditures are such that:
+
+**A4.** In any country $j$, total expenditure on variety $\omega$ of good $k$ is
+$$
+x_{j}^{k}(\omega)=\left[p_{j}^{k}(\omega) / p_{j}^{k}\right]^{1-\sigma_{j}^{k}} \cdot \alpha_{j}^{k} w_{j} L_{j}
+$$
+
+[^ds]: Demand comes from the usual Dixit-Stiglitz aggregator model. The basics of this model can be seen [here](http://www.columbia.edu/~jid2106/td/dixitstiglitzbasics.pdf).
+
+where $p_j^k\equiv[\sum_{\omega'\in\Omega} p_j^k(\omega)^{1-\sigma_j^k}]^{1/(1-\sigma_j^k)}$ is the price index _within_ industry $k$ of country $j$. The country $j$'s consumer price index is defined as: $p_j\equiv\Pi_{k=1}^K(p_j^k)^{\alpha_j^k}$.
+
+**Trade balance.** Denote by $x_{i j}^{k} \equiv \sum_{\omega \in \Omega_{i j}^{k}} x_{j}^{k}(\omega)$ the value of total exports from country $i$ to country $j$ in industry $k$, where $\Omega_{i j}^{k}$ is the set of varieties exported by country $i$ to country $j$ in industry $k$. Similarly, denote by $\pi_{i j}^{k} \equiv x_{i j}^{k} / \sum_{i^{\prime}=1}^{I} x_{i^{\prime} j}^{k}$ the share of exports from country $i$ in country $j$ and industry $k$. The final assumption is the following:
+
+**A5.** For any country $i$, trade is balanced
+$$
+\sum_{j=1}^{I} \sum_{k=1}^{K} \pi_{i j}^{k} \alpha_{j}^{k} \gamma_{j}=\gamma_{i},
+$$
+where $\gamma_{i} \equiv w_{i} L_{i} / \sum_{i^{\prime}=1}^{I} w_{i^{\prime}} L_{i^{\prime}}$ is the share of country $i$ in world income.
+
+## Calibration
+
+We start the calibration by choosing an appropriate value for $\theta$. From Table 3 in @costinot2012goods I selected column (3), $\theta = 6.534$, where the method of estimation was an IV, to be used throughout this project.
+
+Next, we need the trade flows, $x_{ij}^{k}$ by source country $i$, destination $j$ and industry $k$. We will read the `wiot.fst` file from last class and aggregate the flows.
+
+
+```{r trade-flows}
+library(data.table)
+library(fst)
+
+trade_flows <- read_fst("output/wiot.fst", as.data.table = TRUE)
+trade_flows <- trade_flows[, by = c("out_ind", "out_country", "in_country"),
+                           .(value = sum(value))]
+head(trade_flows)
+#' Creates the log(1+) of value
+trade_flows[, `:=`(
+  log1_value = log(1 + value)
+  )]
+#' Write trade_flows to fst file
+write_fst(trade_flows, "output/trade_flows.fst")
+```
+
+_Estimating revealed productivities_ 
+
+We have to estimate the following equation:
+
+$$
+\begin{equation}
+\ln x_{ij}^k=\delta_{ij}+\delta_{j}^k+\delta_{i}^k+\varepsilon_{ij}^k
+\end{equation}
+$$
+
+and then invert the fixed effect of exporter-industry to get the productivity $z_i^k$. I extract the revealed productivity of country $i$ in industry $k$ as $z_{i}^k=\exp(\delta_i^k / \theta)$, notice we have normalized all USA productivities and industry _A01	Crop and animal production, hunting and related service activities_ in all other countries to 1, similar to what the original authors have done in Table 2.
+
+Let's create the dummies by ourselves, so they are named when `fixef` is called
+
+```{r}
+trade_flows[, `:=`(
+  delta_ij = paste0(out_country, "_", in_country),
+  delta_jk = paste0(in_country, "_", out_ind),
+  delta_ik = paste0(out_country, "_", out_ind)
+)]
+```
+
+Run the regression of $\log(1+x)$ (But NOT YOU! You should use the PML method to get full grade) in order to have a complete matrix of productivities. Rearrange the USA to be the first country such that the fixed effects are normalized by it.
+
+```{r}
+library(fixest)
+
+eq19 <- feols(
+  log1_value~1|delta_ij+delta_jk+delta_ik,
+  data = trade_flows[order(-out_country)])
+fes <- fixef(eq19)
+```
+
+Now, we extract the revealed productivity of country $i$ in industry $k$ as  $z_{i}^k=\exp(\delta_i^k / \theta)$
+
+```{r zik}
+theta <- 6.534
+z_ik <- data.table(delta_ik = names(fes$delta_ik), fe = fes$delta_ik)
+z_ik[, `:=`(
+  z_ik = exp(fe / theta),
+  out_country = sub("([[:alpha:]]+)_.*", "\\1", delta_ik),
+  out_ind = as.integer(sub("[[:alpha:]]+_(.*)", "\\1", delta_ik)))]
+```
+
+_Estimating $\alpha_j^k$_
+
+This is the share of expenditures in industry $k$ for importer country $j$. This must be computed from the destination values, that is, industry $k$ is found in the columns of WIOD's input-output matrix.  It's the industry where the importer country is spending inputs from all countries and all other industries. We compute $\alpha_j^k$ as the proportion of country $j$ expenditures in this industry to total expenditures.
+
+```{r alphajk}
+#' share of expenditures in k industry for in_country j. This must be computed
+#' from in_ind!! It's the industry k where the importer country is spending
+wiot <- read_fst("output/wiot.fst", as.data.table = TRUE)
+alpha_jk <- wiot[, by = c("in_country", "in_ind"),
+                        .(alpha_jk = sum(value))]
+alpha_jk[, by = "in_country",
+         alpha_jk := alpha_jk / sum(alpha_jk)]
+
+#' Compatibilize industry name with the rest of data
+setnames(alpha_jk, "in_ind", "out_ind")
+setkey(alpha_jk, in_country, out_ind)
+#' Check alphas sum to one
+alpha_jk[, by = in_country, sum(alpha_jk)]
+```
+
+_Estimating $\pi_{ij}^k$_
+
+The trade shares are defined as $\pi_{ij}^k:=x_{ij}^k / \sum_{i'} x_{i'j}^k$, where the summation index represents all countries, $i'\in \mathcal{I}$. This can be done straight from the `trade_flows` data.table previously computed.
+
+```{r pi-ijk}
+trade_flows <- read_fst("output/trade_flows.fst", as.data.table = TRUE)
+pi_ijk <- trade_flows[, by = c("in_country", "out_ind"),
+                      .(out_country,
+                        pi_ijk = value / sum(value))]
+#' Compute $\pi_{jj}^k$ since its useful to estimate trade costs
+pi_jjk <- pi_ijk[out_country == in_country]
+pi_ijk <- merge(pi_ijk, pi_jjk[, -c("out_country")], 
+                 by = c("in_country", "out_ind"), 
+                 all.x = TRUE)
+setnames(pi_ijk, c("pi_ijk.x", "pi_ijk.y"), c("pi_ijk", "pi_jjk"))
+setkeyv(pi_ijk, c("out_country", "in_country", "out_ind"))
+rm(pi_jjk)
+#' Check $\pi_{ij}^k$ sum to one over in_country and out_ind
+pi_ijk[, by = c("in_country", "out_ind"), sum(pi_ijk)]
+```
+
+_Matching wages to guarantee balanced trade_
+
+We assume trade shares in the baseline economy (in the model) are equal to the ones observed in the data (as well as consumption shares over sectors per country), and use this to find the wages that  guarantee balanced trade. So, we need to compute what goes into assumption A5 of @costinot2012goods. 
+
+$$ 
+\begin{equation}
+   \sum_j\sum_k \pi_{ij}^k\alpha_j^k\gamma_j = \gamma_i
+\end{equation}
+$$
+
+After some manipulation of the above equation we arrive at a linear system of the form:
+
+$$
+\begin{equation}
+  \Lambda\cdot\gamma = \gamma
+\end{equation}
+$$
+
+where $\gamma=[\gamma_1, \gamma_2, \ldots, \gamma_I]'$ and $\lambda_{ij}=\sum_k \pi_{ij}^k \alpha_{j}^k$ are the entries of the matrix $\Lambda$.
+
+We have already estimated, $\alpha_{j}^k$ and $\pi_{ij}^k$ from data. With those values we can compute $\lambda_{ij}$ and assemble the $\Lambda$ matrix. We are left to solve the system $\Lambda\cdot\gamma=\gamma$. Beware the constraint that $\mathbf{1}\cdot\gamma=1$, that is, we need to normalize the resulting eigenvector. This system is the definition of the eigenvector $\gamma$ associated to the $\Lambda$'s matrix egeinvalue equal to one! Therefore, all we need to find $\gamma$ is this eigenvector and normalize it, such that its entries sum to one. (Note this is not the same as the eigenvector's norm equal to one!).
+
+```{r lambda}
+lambda_ij <- copy(pi_ijk)
+lambda_ij[alpha_jk, on = c("in_country", "out_ind"),
+                    lambda_ij := pi_ijk*alpha_jk]
+lambda_ij <- lambda_ij[, by = c("out_country", "in_country"),
+                       .(lambda_ij = sum(lambda_ij))][
+                         order(out_country)]
+```
+
+```{r eigen}
+#' Create the $\Lambda$ matrix
+Lambda <- dcast(lambda_ij, out_country~in_country, value.var = "lambda_ij")
+Lambda <- as.matrix(Lambda[, -1])
+#' Eigen value = 1 and corresponding eigenvector 
+idx <- which.min(abs(eigen(Lambda)$values - 1))
+gamma <- eigen(Lambda)$vectors[, idx] / sum(eigen(Lambda)$vectors[, idx])
+gamma_i <- data.table(out_country = colnames(Lambda), gamma_i = as.numeric(gamma))
+#' Check the sum of $\gamma_i=1$, minimum and maximum values
+gamma_i[, .(sum = sum(gamma_i), min = min(gamma_i), max = max(gamma_i))]
+
+#' Other method to compute gamma_i, iterate!
+gamma_old <- rep(1/nrow(Lambda), nrow(Lambda))
+for (i in seq_len(1000)) {
+  gamma_new <- tcrossprod(Lambda, t(gamma_old))
+  if (max(abs(gamma_old - gamma_new)) < 1e-5) 
+    break
+  
+  gamma_old <- gamma_new
+}
+
+gamma_i <- cbind(gamma_i, gamma_new = gamma_new)
+```
+
+Once we have the solution $\gamma$, the vector of coutries shares on world income, it is possible to calculate the wages that guaratee assumption A5 as $w_i=1/L_i \cdot\sum_{i'}w_{i'}L_{i'}$, where $L_i$ represents the labor force in country $i$ and I normalize USA's wage to 1.
+
+_Computing trade costs $d_{ij}^k$_
+
+## References
