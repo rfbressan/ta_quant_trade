@@ -94,8 +94,6 @@ head(trade_flows)
 trade_flows[, `:=`(
   log1_value = log(1 + value)
   )]
-#' Write trade_flows to fst file
-write_fst(trade_flows, "output/trade_flows.fst")
 ```
 
 _Estimating revealed productivities_ 
@@ -140,106 +138,18 @@ z_ik[, `:=`(
   z_ik = exp(fe / theta),
   out_country = sub("([[:alpha:]]+)_.*", "\\1", delta_ik),
   out_ind = as.integer(sub("[[:alpha:]]+_(.*)", "\\1", delta_ik)))]
+#' Merge back into trade_flows as this is our main dataset. Both z_ik and z_jk
+trade_flows <- merge(trade_flows, z_ik[, .(out_country, out_ind, z_ik)],
+                     by = c("out_country", "out_ind"),
+                     all.x = TRUE)
+trade_flows <- merge(trade_flows, z_ik[, .(out_country, out_ind, z_ik)],
+                     by.x = c("in_country", "out_ind"),
+                     by.y = c("out_country", "out_ind"),
+                     all.x = TRUE)
+setnames(trade_flows, c("z_ik.x", "z_ik.y"), c("z_ik", "z_jk"))
+#' Write trade_flows to fst file
+write_fst(trade_flows, "output/trade_flows.fst")
 ```
 
-_Estimating $\alpha_j^k$_
-
-This is the share of expenditures in industry $k$ for importer country $j$. This must be computed from the destination values, that is, industry $k$ is found in the columns of WIOD's input-output matrix.  It's the industry where the importer country is spending inputs from all countries and all other industries. We compute $\alpha_j^k$ as the proportion of country $j$ expenditures in this industry to total expenditures.
-
-```{r alphajk}
-#' share of expenditures in k industry for in_country j. This must be computed
-#' from in_ind!! It's the industry k where the importer country is spending
-wiot <- read_fst("output/wiot.fst", as.data.table = TRUE)
-alpha_jk <- wiot[, by = c("in_country", "in_ind"),
-                        .(alpha_jk = sum(value))]
-alpha_jk[, by = "in_country",
-         alpha_jk := alpha_jk / sum(alpha_jk)]
-
-#' Compatibilize industry name with the rest of data
-setnames(alpha_jk, "in_ind", "out_ind")
-setkey(alpha_jk, in_country, out_ind)
-#' Check alphas sum to one
-alpha_jk[, by = in_country, sum(alpha_jk)]
-```
-
-_Estimating $\pi_{ij}^k$_
-
-The trade shares are defined as $\pi_{ij}^k:=x_{ij}^k / \sum_{i'} x_{i'j}^k$, where the summation index represents all countries, $i'\in \mathcal{I}$. This can be done straight from the `trade_flows` data.table previously computed.
-
-```{r pi-ijk}
-trade_flows <- read_fst("output/trade_flows.fst", as.data.table = TRUE)
-pi_ijk <- trade_flows[, by = c("in_country", "out_ind"),
-                      .(out_country,
-                        pi_ijk = value / sum(value))]
-#' Compute $\pi_{jj}^k$ since its useful to estimate trade costs
-pi_jjk <- pi_ijk[out_country == in_country]
-pi_ijk <- merge(pi_ijk, pi_jjk[, -c("out_country")], 
-                 by = c("in_country", "out_ind"), 
-                 all.x = TRUE)
-setnames(pi_ijk, c("pi_ijk.x", "pi_ijk.y"), c("pi_ijk", "pi_jjk"))
-setkeyv(pi_ijk, c("out_country", "in_country", "out_ind"))
-rm(pi_jjk)
-#' Check $\pi_{ij}^k$ sum to one over in_country and out_ind
-pi_ijk[, by = c("in_country", "out_ind"), sum(pi_ijk)]
-```
-
-_Matching wages to guarantee balanced trade_
-
-We assume trade shares in the baseline economy (in the model) are equal to the ones observed in the data (as well as consumption shares over sectors per country), and use this to find the wages that  guarantee balanced trade. So, we need to compute what goes into assumption A5 of @costinot2012goods. 
-
-$$ 
-\begin{equation}
-   \sum_j\sum_k \pi_{ij}^k\alpha_j^k\gamma_j = \gamma_i
-\end{equation}
-$$
-
-After some manipulation of the above equation we arrive at a linear system of the form:
-
-$$
-\begin{equation}
-  \Lambda\cdot\gamma = \gamma
-\end{equation}
-$$
-
-where $\gamma=[\gamma_1, \gamma_2, \ldots, \gamma_I]'$ and $\lambda_{ij}=\sum_k \pi_{ij}^k \alpha_{j}^k$ are the entries of the matrix $\Lambda$.
-
-We have already estimated, $\alpha_{j}^k$ and $\pi_{ij}^k$ from data. With those values we can compute $\lambda_{ij}$ and assemble the $\Lambda$ matrix. We are left to solve the system $\Lambda\cdot\gamma=\gamma$. Beware the constraint that $\mathbf{1}\cdot\gamma=1$, that is, we need to normalize the resulting eigenvector. This system is the definition of the eigenvector $\gamma$ associated to the $\Lambda$'s matrix egeinvalue equal to one! Therefore, all we need to find $\gamma$ is this eigenvector and normalize it, such that its entries sum to one. (Note this is not the same as the eigenvector's norm equal to one!).
-
-```{r lambda}
-lambda_ij <- copy(pi_ijk)
-lambda_ij[alpha_jk, on = c("in_country", "out_ind"),
-                    lambda_ij := pi_ijk*alpha_jk]
-lambda_ij <- lambda_ij[, by = c("out_country", "in_country"),
-                       .(lambda_ij = sum(lambda_ij))][
-                         order(out_country)]
-```
-
-```{r eigen}
-#' Create the $\Lambda$ matrix
-Lambda <- dcast(lambda_ij, out_country~in_country, value.var = "lambda_ij")
-Lambda <- as.matrix(Lambda[, -1])
-#' Eigen value = 1 and corresponding eigenvector 
-idx <- which.min(abs(eigen(Lambda)$values - 1))
-gamma <- eigen(Lambda)$vectors[, idx] / sum(eigen(Lambda)$vectors[, idx])
-gamma_i <- data.table(out_country = colnames(Lambda), gamma_i = as.numeric(gamma))
-#' Check the sum of $\gamma_i=1$, minimum and maximum values
-gamma_i[, .(sum = sum(gamma_i), min = min(gamma_i), max = max(gamma_i))]
-
-#' Other method to compute gamma_i, iterate!
-gamma_old <- rep(1/nrow(Lambda), nrow(Lambda))
-for (i in seq_len(1000)) {
-  gamma_new <- tcrossprod(Lambda, t(gamma_old))
-  if (max(abs(gamma_old - gamma_new)) < 1e-5) 
-    break
-  
-  gamma_old <- gamma_new
-}
-
-gamma_i <- cbind(gamma_i, gamma_new = gamma_new)
-```
-
-Once we have the solution $\gamma$, the vector of coutries shares on world income, it is possible to calculate the wages that guaratee assumption A5 as $w_i=1/L_i \cdot\sum_{i'}w_{i'}L_{i'}$, where $L_i$ represents the labor force in country $i$ and I normalize USA's wage to 1.
-
-_Computing trade costs $d_{ij}^k$_
 
 ## References

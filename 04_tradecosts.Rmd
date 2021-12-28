@@ -1,0 +1,47 @@
+---
+title: "03 - Expenditure and exports shares"
+author: "Rafael F. Bressan"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    css: "style.css"
+bibliography: "references.bib"
+link-citations: yes
+---
+
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  TeX: { 
+      equationNumbers: { 
+            autoNumber: "all",
+            formatNumber: function (n) {return n}
+      } 
+  }
+});
+</script>
+
+## Calibration - _continued_
+
+```{r loading}
+library(data.table)
+library(fst)
+
+wiot <- read_fst("output/wiot.fst", as.data.table = TRUE)
+trade_flows <- read_fst("output/trade_flows.fst", as.data.table = TRUE)
+```
+
+Let's create some auxiliary variables to easily compute trade costs afterwards.
+$\delta_{ij}^k \equiv \pi_{ij}^k / \pi_{jj}^k$.
+Also, let $\text{z_ratio} = z_i^k / z_j^k$ and $\text{w_ratio} = w_i / w_j$.
+
+```{r}
+trade_flows[, `:=`(
+  delta_ijk = pi_ijk / pi_jjk,
+  z_ratio_ijk = z_ik / z_jk,
+  w_ratio_ij = wage_i / wage_j
+)]
+```
+
+_Computing the trade costs $d_{ij}^k$_
