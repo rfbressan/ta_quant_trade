@@ -1,0 +1,65 @@
+---
+title: "05 - Counterfactual Analysis"
+author: "Rafael F. Bressan"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    css: "style.css"
+bibliography: "references.bib"
+link-citations: yes
+---
+
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  TeX: { 
+      equationNumbers: { 
+            autoNumber: "all",
+            formatNumber: function (n) {return n}
+      } 
+  }
+});
+</script>
+
+## Counterfactual analysis
+
+Now that we have implemented and calibrated the model, we are able to attain our second objective, find the welfare changes from counterfactual scenarios. But let's first define our welfare metric.
+
+Welfare in this economy is defined as the real purchasing power of wages, $W_i\equiv w_i/p_i$, where $p_i=$ is the price index. We will compute percentual change in welfare as $\log(W^{base}/W^{cf})\cdot 100$. So, in order to calculate welfare, we need the price index for each country. Recapitulating from @eaton2002technology we can find the price **parameter** $\Phi_j^k$ as $\sum_i(w_id_{ij}^k/z_i^k)^{-\theta}$ and from @costinot2012goods we know that the price **index** is given by $p_j=\Pi_k(p_j^k)^{\alpha_j^k}$, where $p_j^k=(\Phi_j^k)^{-1/\theta}$ is the price index for industry $k$. Once we have found the wages $w_i$ in the newly simulated counterfactual, we are able to find the price index, therefore, the welfare for each country in this scenario.
+
+To simulate a counterfactual scenario we need to change one or more exogenous parameters and then solve back the model, starting with the endogenous wages. We have the following guideline:
+
+1. Find wages from balanced trade condition:
+
+$$
+\begin{equation}
+  \sum_j\sum_k \frac{(w_id_{ij}^k/z_i^k)^{-\theta}}{\sum_{i'}(w_{i'}d_{i'j}^k/z_{i'}^k)^{-\theta}}\cdot\alpha_j^k w_j L_j =w_i L_i
+\end{equation}
+$$
+
+2. Find price parameter $\Phi_j^k=\sum_i(w_id_{ij}^k/z_i^k)^{-\theta}$
+
+3. Find price index $p_j=\Pi_k(p_j^k)^{\alpha_j^k}$, where $p_j^k=(\Phi_j^k)^{-1/\theta}$
+
+4. Find welfare $W_i = w_i/p_i$
+
+5. Find trade shares $\pi_{ij}^k=\frac{(w_id_{ij}^k/z_i^k)^{-\theta}}{\Phi_j^k}$
+
+6. Find trade values $x_{ij}^k=\pi_{ij}^k \alpha_j^k w_j L_j$
+
+Where steps 5 and 6 are optional to this project but they help at giving a complete answer to the simulation process.
+
+The most important step is the first one, where we need to solve for endogenous wages from a non-linear system of equations. This system is solved numerically and, for our project, is moderately sized at 44 countries.
+
+Counterfactual scenarios are created based on the problem proposed and changes in **exogenous** variables, like productivities, trade costs or working population. With the new values for those exogenous variables, you should apply the guideline above and compare the results with the baseline economy we calibrated during the previous sessions.
+
+## Shiny App Example
+
+The [web-app](https://rfbressan.shinyapps.io/trade_project1/) linked has interactive visualizations on some scenarios and metrics made for the 2021 project for this course.
+
+We simulated 3 scenarios to study the impact of COVID-19 pandemic on World welfare. The first one is to assume an increase of 10% on all international trade costs. The pandemic had countries rising tariff and non-tariff barriers to trade, blacklistted products were forbiden to both entry and leaving countries. The second scenario relates to lockdown imposition and its effects on productivities. We keep the normalization done in the calibration and change productivities according to the OECD projections[^oecd]. That way, the USA is still the reference country, and other countries had lost (or gained in the unique case of Turkey) **relative productivity**. Countries not contemplated in OECD forecasts, like Brazil and the rest of the world among others, had their changes in relative productivity set as the median value of all other countries.  Finally, our last scenario combines the previous two, trade costs have increased and at the same time productivities were reduced.
+
+[^oecd]: Accessible at: [https://data.oecd.org/lprdty/labour-productivity-forecast.htm](https://data.oecd.org/lprdty/labour-productivity-forecast.htm)
+
+## References

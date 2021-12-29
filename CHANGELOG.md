@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [v0.1.1-alpha](https://github.com/rfbressan/ta_quant_trade/releases/tag/v0.1.1-alpha) - 2021-12-29
+
+<small>[Compare with v0.1.0-alpha](https://github.com/rfbressan/ta_quant_trade/compare/v0.1.0-alpha...v0.1.1-alpha)</small>
+
+### Bug Fixes
+- Session 04 name changed ([a6b8fc5](https://github.com/rfbressan/ta_quant_trade/commit/a6b8fc57654dd28c64f5bf70514a35061649ae57) by Rafael Bressan).
+
+
 ## [v0.1.0-alpha](https://github.com/rfbressan/ta_quant_trade/releases/tag/v0.1.0-alpha) - 2021-12-29
 
 <small>[Compare with v0.0.1](https://github.com/rfbressan/ta_quant_trade/compare/v0.0.1...v0.1.0-alpha)</small>
