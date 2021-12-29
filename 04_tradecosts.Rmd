@@ -90,14 +90,23 @@ trade_flows[, `:=`(
 )]
 ```
 
-We should perform some checks to see if our calculations make sense. For example, $\hat\pi_{ij}^k$ must sum to one over $i$, helding fixed $j$ and $k$.
+
+Once we have computed trade costs, we finally have calibrated the model by inputing $\theta$'s value taken from the orignal article to be 6.543, revealed productivities found by means of a regression like equation (6) in [session 2](02_eatonkortum.html), shares $\alpha_j^k$ and $\pi_{ij}^k$ and labor force $L_i$ are calculated (or gathered) from WIOD data, shares of world income and consequently, wages are matched such that [assumption A5](02_eatonkortum.html) holds and the last term computed is trade costs, which is a **residual** term and is found through equation (1) with the additional assumption, $d_{jj}^k=1$. 
+
+Now we can check the calibration quality. We should perform some checks to see if our calculations make sense. For example, $\hat\pi_{ij}^k$ must sum to one over $i$, helding fixed $j$ and $k$. Actually, $\hat\pi_{ij}^k$ must match exactly the ones computed from the data. Moreover, although the predicted trade flows, $\hat x_{ij}^k$, are not guaranteed to match the observed ones, they should at least be highly correlated.  
 
 ```{r}
+set.seed(657286)
+# pi sum to one
 trade_flows[, by = c("in_country", "out_ind"), sum(pred_pi)]
+# predicted pi equals actual pi
+trade_flows[sample(.N, 20), .(out_country, in_country, out_ind, pred_pi, pi_ijk)]
+# Correlations
+trade_flows[, .(cor(pred_value, value, use = "complete"))]
+trade_flows[, .(cor(pred_pi, pi_ijk, use = "complete"))]
 ```
 
-
-Finally, I have calibrated the model inputing $\theta$'s value taken from the orignal article to be 6.543, revealed productivities are found by means of a regression like equation \@ref(eq:productivity), shares $\alpha_j^k$ and $\pi_{ij}^k$ and labor force $L_i$ are calculated (or gathered) from WIOD data, shares of world income and consequently, wages are matched such that equation \@ref(eq:bal-trade) helds and the last term computed is trade costs, which is a **residual** term and is found through equation \@ref(eq:bilateral-trade) with the additional assumption of $d_{jj}^k=1$. Now I can check the calibration quality.
+As you can see above, there are some invalid values for $\hat\pi_{ij}^k$ (i.e. `NaN` or `Inf`). This is due to the fact that some countries do not trade to each other, hence, a few $x_{ij}^{kl}$ trade flows are zero and this may lead to either $\pi_{ij}^k=0$ or $\pi_{jj}^k=0$. **I will leave it to you to figure out how this can be a problem and a way get around it!**
 
 
 ## References
