@@ -1,5 +1,5 @@
 ---
-title: "03 - Expenditure and exports shares"
+title: "04 - Trade costs"
 author: "Rafael F. Bressan"
 date: "`r Sys.Date()`"
 output:
