@@ -30,6 +30,7 @@ library(fst)
 
 wiot <- read_fst("output/wiot.fst", as.data.table = TRUE)
 trade_flows <- read_fst("output/trade_flows.fst", as.data.table = TRUE)
+theta <- 6.543
 ```
 
 Let's create some auxiliary variables to easily compute trade costs afterwards.
@@ -45,3 +46,58 @@ trade_flows[, `:=`(
 ```
 
 _Computing the trade costs $d_{ij}^k$_
+
+From equation (1) below, valid under assumptions 1 to 4 in @costinot2012goods it's possible to compute all values of $d_{ij}^k$.
+
+$$
+\begin{equation}
+x_{ij}^k=\frac{(w_id_{ij}^k/z_i^k)^{-\theta}}{\sum_{i'}(w_{i'}d_{i'j}^k/z_{i'}^k)^{-\theta}}\cdot\alpha_j^k w_j L_j
+\end{equation}
+$$
+
+and given the definition, $\pi_{ij}^k\equiv x_{ij}^k / \sum_i x_{ij}^k$, we arrive at (You should prove it in your notes!):
+
+$$
+\begin{equation}
+\pi_{ij}^k = \frac{(w_id_{ij}^k/z_i^k)^{-\theta}}{\sum_{i'}(w_{i'}d_{i'j}^k/z_{i'}^k)^{-\theta}}.
+\end{equation}
+$$
+
+This is a non-linear system of $I\times I\times K$ equations to solve for each $d_{ij}^k$. If we further impose $d_{jj}^k=1$, then it can be easily solved for $d_{ij}^k$ when $i\neq j$ in terms of $\delta_{ij}^k \equiv \pi_{ij}^k / \pi_{jj}^k$, **at the cost of not matching exactly** trade flows $x_{ij}^k$, thus:
+
+$$
+\begin{equation}
+  \delta_{ij}^k = \left(\frac{d_{ij}^k\cdot w_i/w_j}{z_i^k / z_j^k}\right)^{-\theta}
+\end{equation}
+$$
+
+and inverting this relation for $d_{ij}^k$ we have:
+
+$$
+\begin{equation}
+  d_{ij}^k=\frac{\left(\delta_{ij}^k\right)^{-1/\theta}}{w_i/w_j}\cdot z_i/z_j
+\end{equation}
+$$
+
+```{r trade-costs}
+trade_flows[, d_ijk := ((delta_ijk)^(-1/theta))*z_ratio_ijk/w_ratio_ij]
+#' Insert predicted trade flows and shares into trade_flows
+trade_flows[, by = c("in_country", "out_ind"),
+            Phi_jk := sum((wage_i*d_ijk / z_ik)^(-theta))]
+trade_flows[, `:=`(
+  pred_value = (((wage_i*d_ijk / z_ik)^(-theta))/Phi_jk)*alpha_jk*wage_j*employed_j,
+  pred_pi = ((wage_i*d_ijk / z_ik)^(-theta))/Phi_jk
+)]
+```
+
+We should perform some checks to see if our calculations make sense. For example, $\hat\pi_{ij}^k$ must sum to one over $i$, helding fixed $j$ and $k$.
+
+```{r}
+trade_flows[, by = c("in_country", "out_ind"), sum(pred_pi)]
+```
+
+
+Finally, I have calibrated the model inputing $\theta$'s value taken from the orignal article to be 6.543, revealed productivities are found by means of a regression like equation \@ref(eq:productivity), shares $\alpha_j^k$ and $\pi_{ij}^k$ and labor force $L_i$ are calculated (or gathered) from WIOD data, shares of world income and consequently, wages are matched such that equation \@ref(eq:bal-trade) helds and the last term computed is trade costs, which is a **residual** term and is found through equation \@ref(eq:bilateral-trade) with the additional assumption of $d_{jj}^k=1$. Now I can check the calibration quality.
+
+
+## References
