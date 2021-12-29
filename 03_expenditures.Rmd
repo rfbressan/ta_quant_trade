@@ -53,7 +53,7 @@ alpha_jk[, by = in_country, sum(alpha_jk)]
 
 _Estimating $\pi_{ij}^k$_
 
-The trade shares are defined as $\pi_{ij}^k:=x_{ij}^k / \sum_{i'} x_{i'j}^k$, where the summation index represents all countries, $i'\in \mathcal{I}$. This can be done straight from the `trade_flows` data.table previously computed.
+The trade shares are defined as $\pi_{ij}^k\equiv x_{ij}^k / \sum_{i'} x_{i'j}^k$, where the summation index represents all countries, $i'\in \mathcal{I}$. This can be done straight from the `trade_flows` data.table previously computed.
 
 ```{r pi-ijk}
 pi_ijk <- trade_flows[, by = c("in_country", "out_ind"),
@@ -153,11 +153,14 @@ trade_flows <- trade_flows[alpha_jk, on = c("in_country", "out_ind"),
 setnames(trade_flows, 
          c("i.gamma_i", "i.employed_i", "i.wage_i"),
          c("gamma_j", "employed_j", "wage_j"))
-
+#' Write trade_flows to fst file
+write_fst(trade_flows, "output/trade_flows.fst")
 ```
 
-You should check we have the right values of $\gamma$. Equation (1) below must hold (i.e., balanced trade).
+You should check we have the right values of $\gamma$. Equation (3) below must hold (i.e., balanced trade).
 
 $$
 \sum_{j=1}^{I} \sum_{k=1}^{K} \pi_{i j}^{k} \alpha_{j}^{k} \gamma_{j}=\gamma_{i},
 $$
+
+## References
