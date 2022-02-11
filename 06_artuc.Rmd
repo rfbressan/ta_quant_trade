@@ -35,25 +35,45 @@ is denoted by $p$. Production is done under competitive conditions with constant
 $q_i = Q_i (L_i , K_i )$, sector $i\in\{X, Y\}$, $L_i$ and $K_i$ denote labor and capital employed in sector $i$ respectively.
 Capital is inelastically supplied, and specific to its sector. Supply of labor in the economy is exogenously given at a value $\bar L$.
 
-Workers discount the future at the common rate $\beta<1$ and their location decision are characterised as follows.
+Workers discount the future at the common rate $\beta<1$ and their location decision are characterised as follows. In each period, each worker receives an idiosyncratic benefit $\varepsilon_t^j$ if that worker is in sector $j\in \{X, Y\}$ at the end of the period. This implies an idiosyncratic moving cost:
+
+$$\mu_t^i\equiv\varepsilon_t^i-\varepsilon_t^j.$$
+
+The cdf of this moving cost is denoted $G$. A worker who changes sectors also incurs a common cost equal to $C\geq 0$.
+
+_Worker optimization_
+
+$$
+V^i(L_t)=w_t^i+E\max\{\varepsilon_t^i+\beta V^i(L_{t+1}), \varepsilon_t^j-C+\beta V^j(L_{t+1})\}
+$$
+
+At any date $t$ there is a threshold value of $\mu_t^i$, say $\bar\mu_t^i$, such that the worker will stay in $i$ if $\mu_t^i>\bar\mu_t^i$. Then,
+
+$$
+V^i(L_t)=w_t^i+\beta V^i(L_{t+1})+\underbrace{E\max\{0, \bar\mu_t^i - \mu_t^i\}}_{\Omega(\bar\mu_t^i)}
+$$
+
+The law of motion for labor allocations can be written as:
+
+$$
+L_{t+1}^i=\underbrace{(1-G(\bar\mu_t^i))L_t^i}_{\text{stay in i}}+\underbrace{G(\bar\mu_t^j)L_t^j}_{\text{come from j}}
+$$
+
+since the fraction of workers in $i$ who move to $j$ is $G(\bar\mu_t^i)$.
 
 ## Python implementation
 
 **Change the model to CES? Production or preferences, or both?**
 
-Here is a brief description of how to implement the model. We start by computing the free-trade steady-state.
+Here is a brief description of how to implement the model. We start by computing the free-trade steady-state, where $L_{t+1}^i=L_t^i$ for $i\in \{X, Y\}$, using steady-state versions of equations (1) through (4) from @artucc2008delay. We will arrive at a vector of steady-state variables, $(L^i, w^i, V^i, \bar\mu^i)_{i\in\{X,Y\}}$.
 
-$L_{t+1}^i=L_t^i$ and this implies $G(\bar\mu^i)L^i=G(\bar\mu^j)L^j$. 
+Then, for the time path simulation, we follow the algorith from @artucc2008delay p. 05. The starting (i.e., autarky) price is $p=1$. The authors also show that $G(\mu)=\exp(\mu/\nu)/(1+\exp(\mu/\nu))$ and, $\Omega(\mu)=\nu\log(1+\exp(\mu/\nu))$ for a given parameter $\nu$. Suppose that the economy is in a tariff steady-state at date $t = 0$, and then it is announced that at date $T \geq 0$ and from that date forward, free trade will prevail. Thus, $p_t = 1$ for $t<T$, and $p_t = p^W$ for $t\geq T$.
 
-Next, define
-$H(\bar\mu^x)\equiv\frac{G(\bar\mu^x)}{G(\bar\mu^x)+G(-\bar\mu^x-2C)}$, then $L^x=(1-H(\bar\mu^x))\bar L$ and $L^y=H(\bar\mu^x)\bar L$
-
-Then we follow the algorith from @artucc2008delay p. 05.
-
-Guess values for $V_{t+1}^i$ using simple linear interpolation between steady states. While there is no convergence we keep computing $\bar\mu_t^i$, $L_{t+1}^i$, $w_{t+1}^i$ and update $z_t^i$.
+We guess values for $V_{t+1}^i$ using simple linear interpolation between steady-states. While there is no convergence we keep computing $\bar\mu_t^i$, $L_{t+1}^i$, $w_{t+1}^i$ and update $z_t^i=V^i(L_{t+1})$.
 
 By the end of this loop, we have the time path of all endogenous variables: $\bar\mu_t^i$, $L_t^i$, $w_t^i$ and $V_t^i$.
 
+The implementation below assumes a Cob-Douglas utility function, $U(c^X, c^Y)=2(c^X)^{1/2}(c^Y)^{1/2}$ and, production technology, $Q^i(L^i, K^i)=(L^i)^\alpha (K^i)^{1-\alpha}$.
 
 ```{python artuc, eval=FALSE}
 """
@@ -61,71 +81,116 @@ Created on Thu May  2 21:47:08 2019
 
 @author: brunamirelle
 
-Modified by: Rafael F. Bressan (https://github.com/rfbressan)
-Date: 2021-12-31
+Modified by: Rafael Felipe Bressan (https://github.com/rfbressan)
+Date: 2022-02-10
 """
+
 import numpy as np
+from pandas import value_counts
 from scipy.optimize import fsolve
 
 #Resolve o modelo de Artuc (2008)
 class EconomiaArtuc:
     
-    """
-    Inicializa economia
-    alpha - parâmetro da função de produção (Cobb-Douglas)
-    beta - fator de desconto dos trabalhadores
-    C - custo de mudar de setor
-    K_X e K_Y = dotações de capital em cada setor
-    L_minus = dotação de trabalho na economia
-    p0 = preço pré-liberalização do bem X
-    """
-    def __init__(self, alpha, beta, C, nu, K_X, K_Y, L_minus, p0):
-        self.alpha = alpha
-        self.beta = beta
+    def __init__(self, alpha, beta, C, nu, K_X, K_Y, L_bar, p0):
+        """Inicializa economia
+        
+        :param alpha: parâmetro da função de produção (Cobb-Douglas)
+        :param beta: fator de desconto dos trabalhadores
+        :param C: custo de mudar de setor
+        :param K_X, K_Y: dotações de capital em cada setor
+        :param L_bar: dotação de trabalho na economia
+        :param p0: preço pré-liberalização do bem X
+        :return: objeto da classe EconomiaArtuc
+        """
+        # Checks alpha
+        if self.valid_alpha_bool(alpha):
+            self.alpha = alpha
+        else:
+            raise ValueError(f'Alpha parameter must be between zero and one, open set. Value passed was: {alpha}')
+        
+        # Checks beta
+        if self.valid_beta_bool(beta):
+            self.beta = beta
+        else:
+            raise ValueError(f'Beta parameter must be between zero and one, open set. Value passed was: {beta}')
+        
         self.C = C
         self.nu = nu
         self.K_X = K_X
         self.K_Y = K_Y
-        self.L_minus = L_minus
+        self.L_bar = L_bar
         self.p0 = p0
     
+    def valid_alpha_bool(self, alpha):
+        """Checks whether alpha is in (0, 1)
+
+        :param alpha: Cobb-Douglas parameter
+        :type alpha: float
+        :return: a flag indicating alpha is in (0, 1)
+        :rtype: bool
+        """
+        return (alpha > 0) and (alpha < 1)
+        
+    def valid_beta_bool(self, beta):
+        """Checks whether beta is in (0, 1)
+
+        :param beta: Preferences discount factor
+        :type beta: float
+        :return: a flag indicating beta is in (0, 1)
+        :rtype: bool
+        """
+        return (beta > 0) and (beta < 1)
+
     #Função Omega no paper
     def Omega(self, mu):
+        """Valor da opção do trabalhador
+
+        :param mu: moving cost
+        :type mu: float
+        :return: value
+        :rtype: float
+        """
         return self.nu*np.log(1 + np.exp(mu/self.nu))
     
     #CDF da distribuição logística (diferença dos choques)
     def G(self, mu):
-        return np.exp(mu/self.nu)/(1 + np.exp(mu/self.nu))
+        if mu == np.Inf:
+            return 1.0
+        else:
+            return np.exp(mu/self.nu)/(1 + np.exp(mu/self.nu))
     
     #Condição de primeira ordem para maximização dos lucros
     def FOC(self, L, K, p):
         return p*self.alpha*((L)**(self.alpha-1))*((K)**(1-self.alpha))
     
-    #Deflator
+    #Indice de preços
     def phi(self,p):
         return p**(.5)
     
     #Retorna as equações necessárias para calcular steady-state
-    #vec-guess - valores, salários e thresholds (vetor)
+    #vec_guess - valores, salários e thresholds (vetor)
     #p - preço relativo do bem X no steady-state desejado
     def steady_discrep(self,vec_guess, p):
-        V_X = vec_guess[0]
-        V_Y = vec_guess[1]
-        mu_X = vec_guess[2]
-        mu_Y = vec_guess[3]
-        L_X = vec_guess[4]
-        L_Y = vec_guess[5]
-        w_X = vec_guess[6]
-        w_Y = vec_guess[7]
+        """Equações necessárias para steady-state
+
+        :param vec_guess: initial guess vector
+        :type vec_guess: ndarray of floats
+        :param p: price
+        :type p: float
+        :return: vector of values
+        :rtype: ndarray of floats
+        """
+        vx, vy, mux, muy, lx, ly, wx, wy = vec_guess
         discrep = np.zeros(8)
-        discrep[0] = w_X - self.FOC(L_X, self.K_X, p)/self.phi(p)
-        discrep[1] = w_Y - self.FOC(L_Y, self.K_Y, 1)/self.phi(p)
-        discrep[2] = L_X + L_Y - self.L_minus
-        discrep[3] = mu_X - self.beta*(V_Y-V_X) + self.C
-        discrep[4] = mu_Y - self.beta*(V_X-V_Y) + self.C
-        discrep[5] = V_X - w_X - self.beta*(V_X) - self.Omega(mu_X)
-        discrep[6] = V_Y - w_Y - self.beta*(V_Y) - self.Omega(mu_Y)
-        discrep[7] = L_X - (1-self.G(mu_X))*L_X - self.G(mu_Y)*L_Y
+        discrep[0] = wx - self.FOC(lx, self.K_X, p)/self.phi(p)
+        discrep[1] = wy - self.FOC(ly, self.K_Y, 1)/self.phi(p)
+        discrep[2] = lx + ly - self.L_bar
+        discrep[3] = mux - self.beta*(vy-vx) + self.C
+        discrep[4] = muy - self.beta*(vx-vy) + self.C
+        discrep[5] = vx - wx - self.beta*(vx) - self.Omega(mux)
+        discrep[6] = vy - wy - self.beta*(vy) - self.Omega(muy)
+        discrep[7] = lx - (1-self.G(mux))*lx - self.G(muy)*ly
         #discrep[8] = L_Y - (1-self.G(mu_Y))*L_Y - self.G(mu_X)*L_X
         return discrep  
     
@@ -135,28 +200,32 @@ class EconomiaArtuc:
             return self.steady_discrep(vec_guess, p)
         return fsolve(steady_price, np.ones(8))
     
-    """
-    Resolve o modelo para um dado valor pós-liberalização
-    p_after = preço relativo de X pós-liberalização
-    T_SS = número de períodos até novo steady-state (padrão 30, t=31 é steady-state)
-    effective_at = a partir de que período vale a abertura (padrão é o zero)?
-    tol = Tolerância para convergência do algoritmo
-    """
+ 
     def solve_model(self, p_after, T_SS = 30, effective_at = 0, tol = 1e-5):
+        """Resolve o modelo para um dado valor pós-liberalização
+        
+        :param p_after: preço relativo de X pós-liberalização
+        :param T_SS: número de períodos até novo steady-state (padrão 30, t=31 é steady-state)
+        :param effective_at: a partir de que período vale a abertura (padrão é o zero)?
+        :param tol: Tolerância para convergência do algoritmo
+        :return: time path of endogenous variables
+        :rtype: dictionary
+        """
         #Calcula valores do steady-state inicial e final
         #Inicial
-        V_X_0, V_Y_0, mu_X_0, mu_Y_0, L_X_0, L_Y_0, w_X_0, w_Y_0 = self.solve_steady(self.p0)
+        vx0, vy0, mux0, muy0, lx0, ly0, wx0, wy0 = self.solve_steady(self.p0)
         #Final  
-        V_X_T, V_Y_T, mu_X_T, mu_Y_T, L_X_T, L_Y_T, w_X_T, w_Y_T = self.solve_steady(p_after)
-        
+        vxt, vyt, muxt, muyt, lxt, lyt, wxt, wyt = self.solve_steady(p_after)
         
         #Chutes iniciais para a trajetória dos valores em cada setor
-        z_X_t = np.linspace(V_X_0, V_X_T, T_SS + 1)
-        z_Y_t = np.linspace(V_Y_0, V_Y_T, T_SS + 1)
-        
-        
+        zxt = np.linspace(vx0, vxt, T_SS + 1)
+        zyt = np.linspace(vy0, vyt, T_SS + 1)
+         
         #Trajetória de preços
-        p_t = np.concatenate((np.repeat(self.p0,effective_at),np.repeat(p_after,T_SS + 1 - effective_at)))
+        p_t = np.concatenate(
+          (np.repeat(self.p0,effective_at),
+           np.repeat(p_after,T_SS + 1 - effective_at))
+          )
         
         #print(p_t)
         
@@ -164,42 +233,52 @@ class EconomiaArtuc:
         
         while err > tol:
             #Calcula trajetórias para mu_X e mu_Y
-            mu_X_t = self.beta*(np.concatenate((z_Y_t[1:],[V_Y_T])) -\
-                                np.concatenate((z_X_t[1:],[V_X_T])) ) - self.C
-            mu_Y_t = self.beta*(np.concatenate((z_X_t[1:],[V_X_T])) -\
-                                np.concatenate((z_Y_t[1:],[V_Y_T])) ) - self.C
+            mu_X_t = self.beta*(np.concatenate((zyt[1:],[vyt])) -\
+                                np.concatenate((zxt[1:],[vxt])) ) - self.C
+            mu_Y_t = self.beta*(np.concatenate((zxt[1:],[vxt])) -\
+                                np.concatenate((zyt[1:],[vyt])) ) - self.C
            
             L_X_t = np.empty(T_SS + 1)
             L_Y_t = np.empty(T_SS + 1)
             
-            L_X_t[0] = L_X_0
-            L_Y_t[0] = L_Y_0
+            L_X_t[0] = lx0
+            L_Y_t[0] = ly0
             
             for tt in range(1, T_SS + 1):
-                L_X_t[tt] = (1-self.G(mu_X_t[tt-1]))*L_X_t[tt-1] +\
-                self.G(mu_Y_t[tt-1])*L_Y_t[tt-1]
-                L_Y_t[tt] = self.L_minus - L_X_t[tt]
+                L_X_t[tt] = (
+                  (1-self.G(mu_X_t[tt-1]))*L_X_t[tt-1] +
+                  self.G(mu_Y_t[tt-1])*L_Y_t[tt-1]
+                )
+                L_Y_t[tt] = self.L_bar - L_X_t[tt]
                 
             w_Y_t = self.FOC(L_Y_t, self.K_Y, 1)/self.phi(p_t)
             w_X_t = self.FOC(L_X_t, self.K_X, p_t)/self.phi(p_t)
             
-            z_tilde_X_t = w_X_t + self.beta*np.concatenate((z_X_t[1:], [V_X_T])) + self.Omega(mu_X_t)
-            z_tilde_Y_t = w_Y_t + self.beta*np.concatenate((z_Y_t[1:], [V_Y_T])) + self.Omega(mu_Y_t)
+            z_tilde_X_t = (
+              w_X_t + 
+              self.beta*np.concatenate((zxt[1:], [vxt])) + 
+              self.Omega(mu_X_t)
+            )
+            z_tilde_Y_t = (
+              w_Y_t + 
+              self.beta*np.concatenate((zyt[1:], [vyt])) + 
+              self.Omega(mu_Y_t)
+            )
             
-            err = np.max((np.abs(z_tilde_X_t - z_X_t), np.abs(z_tilde_Y_t - z_Y_t)))
+            err = np.max((np.abs(z_tilde_X_t - zxt), np.abs(z_tilde_Y_t - zyt)))
             
-            z_X_t = z_tilde_X_t 
-            z_Y_t = z_tilde_Y_t
+            zxt = z_tilde_X_t 
+            zyt = z_tilde_Y_t
             
             print(err)
         
         return {
-            'wx': np.concatenate(([w_X_0],w_X_t,[w_X_T])),\
-            'wy': np.concatenate(([w_Y_0],w_Y_t,[w_Y_T])),\
-            'Vx': np.concatenate(([V_X_0],z_X_t,[V_X_T])),\
-            'Vy': np.concatenate(([V_Y_0],z_Y_t,[V_Y_T])),\
-            'Lx': np.concatenate(([L_X_0],L_X_t,[L_X_T])),\
-            'Ly': np.concatenate(([L_Y_0],L_Y_t,[L_Y_T]))
+            'wx': np.concatenate(([wx0],w_X_t,[wxt])),
+            'wy': np.concatenate(([wy0],w_Y_t,[wyt])),
+            'Vx': np.concatenate(([vx0],zxt,[vxt])),
+            'Vy': np.concatenate(([vy0],zyt,[vyt])),
+            'Lx': np.concatenate(([lx0],L_X_t,[lxt])),
+            'Ly': np.concatenate(([ly0],L_Y_t,[lyt]))
             }
 ```
 
@@ -209,31 +288,54 @@ In order to test this class, we can append to the end of `EconomiaArtuc.py` file
 
 
 ```{python streamlit, eval=FALSE}
-# This will execute only if run as a script
+# Script for testing purposes
 if __name__ == "__main__":
-  import matplotlib.pyplot as plt
-  import streamlit as st
-  st.set_page_config(
-    page_title="Artuç Simulation",
-    page_icon="",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    # execute only if run as a script
+    # This is a streamlit application, run it as such:
+    # $ streamlit run EconomiaArtuc.py
+    import matplotlib.pyplot as plt
+    import streamlit as st
+    
+    st.set_page_config(
+        page_title="Artuç Simulation",
+        page_icon=":dollar:",
+        layout="wide",
+        initial_sidebar_state="expanded",
     )
     
     st.title("Artuç et. al. (2008) replication")
-    # Solving the model and ploting wages                             
-    econ = EconomiaArtuc(0.5, 0.97, 1, 0.31, 1, 1, 2, 1)
-    eff_at = st.number_input("Inform the period where the tariff is actually reduced:",
-    value=10,
-    min_value=1,
-    max_value=12,
-    step=1,
-    format="%d")
-    sol = econ.solve_model(0.7, effective_at=int(eff_at))  
-    
+    # Solving the model and ploting wages  
+    # Uses sidebar for economy parameters
+    alpha = st.sidebar.number_input("alpha", min_value=0.01, max_value=0.99, value=0.5)
+    beta = st.sidebar.number_input('beta', min_value=0.01, max_value=0.99, value=0.97)
+    nu = st.sidebar.number_input('nu', value=0.31)
+
+    econ_args = {'alpha': alpha,
+                 'beta': beta,
+                 'C': 1,
+                 'nu': nu,
+                 'K_X': 1,
+                 'K_Y': 1,
+                 'L_bar': 2,
+                 'p0': 1}                      
+    econ = EconomiaArtuc(**econ_args)
+    eff_at = st.sidebar.number_input("Period where the tariff is actually reduced:",
+        value=10,
+        min_value=1,
+        max_value=12,
+        step=1,
+        format="%d")
+    pw = st.sidebar.number_input('pW', value=0.7)
+    sol = econ.solve_model(pw, effective_at=int(eff_at))  
+
     fig1, ax1 = plt.subplots()          
     ax1.plot(sol['wx'], label = 'Sector X')
     ax1.plot(sol['wy'], label = 'Sector Y')
+    w_extended = np.append(sol['wx'], sol['wy'])
+    ax1.vlines(x=eff_at, 
+               ymin=min(w_extended),
+               ymax=max(w_extended),
+               colors='red', linestyles='dashed')
     ax1.set_title("Delayed to t = " + str(eff_at))
     ax1.set_xlabel("time")
     ax1.set_ylabel("Wages")
@@ -242,17 +344,21 @@ if __name__ == "__main__":
     fig2, ax2 = plt.subplots()
     ax2.plot(sol['Lx'], label = 'Sector X')
     ax2.plot(sol['Ly'], label = 'Sector Y')
+    l_extended = np.append(sol['Lx'], sol['Ly'])
+    ax2.vlines(x=eff_at,
+               ymin=min(l_extended),
+               ymax=max(l_extended),
+               colors='red', linestyles='dashed')
     ax2.set_title("Delayed to t = " + str(eff_at))
     ax2.set_xlabel("time")
     ax2.set_ylabel("Labor force")
     ax2.legend()
     
-    col1, col2 = st.beta_columns(2)
+    col1, col2 = st.columns(2)
     with col1:
-      st.pyplot(fig1)
-      with col2:
+        st.pyplot(fig1)
+    with col2:
         st.pyplot(fig2)
 ```
-
 
 ## References
