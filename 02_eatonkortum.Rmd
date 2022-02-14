@@ -157,7 +157,7 @@ write_fst(trade_flows, "output/trade_flows.fst")
 
 ## Python code
 
-```{python zik, eval=FALSE}
+```{python zik-py, eval=FALSE}
 import numpy as np
 import pandas as pd
 
