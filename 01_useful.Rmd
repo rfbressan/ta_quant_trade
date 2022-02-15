@@ -10,6 +10,8 @@ output:
     css: "style.css"
 bibliography: "references.bib"
 link-citations: yes
+params:
+  floor_bool: true
 ---
 
 <script type="text/x-mathjax-config">
@@ -160,6 +162,12 @@ wiot <- wiot[!(out_country %chin% c("TOT")
                | in_country %chin% c("TOT")
                | out_ind > 55
                | in_ind > 55)]
+```
+
+```{r floor, echo=FALSE, eval=params$floor_bool}
+#' Deal with very small values. Anything lower than one is floored
+wiot[value < 1, value := 1]
+print("Flooring is active!")
 ```
 
 This is the _cleaned_ dataset we shall work through this series of classes, save it to a file for posterior loading.

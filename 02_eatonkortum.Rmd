@@ -22,6 +22,10 @@ MathJax.Hub.Config({
 });
 </script>
 
+```{r sequential, include=FALSE}
+targets::tar_read(useful)
+```
+
 ## Theoretical Framework
 
 In this section we will briefly describe the theoretical model as in @costinot2012goods, which is based on @eaton2002technology. It consists of an economy with multiple-countries, multiple industries, and labor as the solely production factor. Intra-industry heterogeneity is allowed, as in @eaton2002technology, each good is available in many varieties.
@@ -168,15 +172,13 @@ wiod_sea = pd.read_excel("input/WIOD_SEA_Nov16.xlsx",
                          engine="openpyxl")
 employed = (wiod_sea
             .query("variable == 'EMP'")
-            .groupby('country')[2014]
+            .groupby('country', as_index=False)[2014]
             .sum()
-            .reset_index()
             .rename(columns={'country': 'out_country', 2014: 'employed_i'})
             )
 row = pd.DataFrame({'out_country': ['ROW'],
                     'employed_i': [employed['employed_i'].sum()]})
 employed = employed.append(row)
-employed.to_csv("output/employed.csv", index=False)
 
 # Starting calibration
 theta = 6.534
@@ -184,19 +186,19 @@ theta = 6.534
 trade_flows = wiot.copy()  # Just to keep names the same as in R code
 # Helps in cleaner code
 ijk_cols = ['out_country', 'in_country', 'out_ind']
+ij_cols = ['out_country', 'in_country']
+ik_cols = ['out_country', 'out_ind']
+jk_cols = ['in_country', 'out_ind']
+
 trade_flows = (trade_flows
                .groupby(ijk_cols, as_index=False)[['value']]
                .sum()
                )
 trade_flows['log1_value'] = np.log(trade_flows['value'] + 1)
-trade_flows['delta_ij'] = trade_flows['out_country'] + \
-    '_' + trade_flows['in_country']
-trade_flows['delta_jk'] = trade_flows['in_country'] + \
-    '_' + trade_flows['out_ind'].astype(str)
-trade_flows['delta_ik'] = trade_flows['out_country'] + \
-    '_' + trade_flows['out_ind'].astype(str)
 
 # Run a fixed-effect regression to extract the revealed productivities
+# Could not get it done in Python! 
+#
 # This takes 1 minute and crashes
 # eq19 = smf.ols('log1_value ~ C(delta_ij)+C(delta_jk)+C(delta_ik)',
 #                data=trade_flows).fit()
@@ -228,14 +230,14 @@ z_ik['out_ind'] = (z_ik['delta_ik'].str.split('_').apply(lambda x: x[1])
 # Merge back into trade_flows as this is our main dataset. Both z_ik and z_jk
 trade_flows = trade_flows.merge(z_ik[['out_country', 'out_ind', 'z_ik']],
                                 how='left',
-                                left_on=['in_country', 'out_ind'],
-                                right_on=['out_country', 'out_ind'])
+                                left_on=jk_cols,
+                                right_on=ik_cols)
 trade_flows.rename(columns={'z_ik': 'z_jk', 'out_country_x': 'out_country'},
                    inplace=True)
+trade_flows.drop('out_country_y', axis=1, inplace=True)
 trade_flows = trade_flows.merge(z_ik[['out_country', 'out_ind', 'z_ik']],
                                 how='left',
-                                on=['out_country', 'out_ind'])
-trade_flows.drop('out_country_y', axis=1, inplace=True)
+                                on=ik_cols)
 ```
 
 ## References

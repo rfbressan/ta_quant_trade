@@ -1,5 +1,5 @@
 ---
-title: "03 - Expenditure and exports shares"
+title: "03 - Expenditure and export shares"
 author: "Rafael F. Bressan"
 date: "`r Sys.Date()`"
 output:
@@ -21,6 +21,10 @@ MathJax.Hub.Config({
   }
 });
 </script>
+
+```{r sequential, include=FALSE}
+targets::tar_read(eatonkortum)
+```
 
 ## Calibration - _continued_
 
@@ -107,11 +111,9 @@ lambda_ij <- lambda_ij[, by = c("out_country", "in_country"),
 Lambda <- dcast(lambda_ij, out_country~in_country, value.var = "lambda_ij")
 Lambda <- as.matrix(Lambda[, -1])
 #' Eigen value = 1 and corresponding eigenvector 
-idx <- which.min(abs(eigen(Lambda)$values - 1))
-gamma <- eigen(Lambda)$vectors[, idx] / sum(eigen(Lambda)$vectors[, idx])
-gamma_i <- data.table(out_country = colnames(Lambda), gamma_i = as.numeric(gamma))
-#' Check the sum of $\gamma_i=1$, minimum and maximum values
-gamma_i[, .(sum = sum(gamma_i), min = min(gamma_i), max = max(gamma_i))]
+# idx <- which.min(abs(eigen(Lambda)$values - 1))
+# gamma <- eigen(Lambda)$vectors[, idx] / sum(eigen(Lambda)$vectors[, idx])
+# gamma_i <- data.table(out_country = colnames(Lambda), gamma_i = as.numeric(gamma))
 
 #' Other method to compute gamma_i, iterate!
 gamma_old <- rep(1/nrow(Lambda), nrow(Lambda))
@@ -123,8 +125,10 @@ for (i in seq_len(1000)) {
   gamma_old <- gamma_new
 }
 
-gamma_i <- cbind(gamma_i, gamma_new) 
-setnames(gamma_i, "V1", "gamma_new")
+gamma_i <- data.table(out_country = colnames(Lambda), 
+                      gamma_i = as.numeric(gamma_new))
+#' Check the sum of $\gamma_i=1$, minimum and maximum values
+gamma_i[, .(sum = sum(gamma_i), min = min(gamma_i), max = max(gamma_i))]
 ```
 
 Once we have the solution $\gamma$, the vector of coutries shares on world income, it is possible to calculate the wages that guaratee assumption A5 as $w_i=\gamma_i/L_i \cdot\sum_{i'}w_{i'}L_{i'}$, where $L_i$ represents the labor force in country $i$ and I normalize USA's wage to 1.
@@ -162,5 +166,88 @@ You should check we have the right values of $\gamma$. Equation (3) below must h
 $$
 \sum_{j=1}^{I} \sum_{k=1}^{K} \pi_{i j}^{k} \alpha_{j}^{k} \gamma_{j}=\gamma_{i},
 $$
+## Python code
+
+```{python expenditures, eval=FALSE}
+# share of expenditures in k industry for in_country j. This must be computed
+# from in_ind!! It's the industry k where the importer country is spending
+alpha_jk = (wiot
+            .groupby(['in_country', 'in_ind'], as_index=False)['value']
+            .sum())
+alpha_jk['alpha_jk'] = (alpha_jk
+                        .groupby('in_country', as_index=False)['value']
+                        .transform(lambda x: x/sum(x)))
+alpha_jk.drop('value', axis=1, inplace=True)
+# Compatibilize industry name with the rest of data
+alpha_jk.rename(columns={'in_ind': 'out_ind'}, inplace=True)
+# Check alphas sum to one
+alpha_jk.groupby('in_country')['alpha_jk'].sum().describe()
+
+# Estimating pi_ijk
+pi_ijk = trade_flows[['in_country', 'out_ind', 'out_country']]
+pi_ijk['pi_ijk'] = (trade_flows
+                    .groupby(['in_country', 'out_ind'], as_index=False)['value']
+                    .transform(lambda x: x/sum(x)))
+# Compute pi_jjk since its useful to estimate trade costs
+pi_jjk = pi_ijk[pi_ijk['out_country'] == pi_ijk['in_country']]
+pi_ijk = pi_ijk.merge(pi_jjk.drop('out_country', axis=1),
+                      on=['in_country', 'out_ind'],
+                      how='left')
+pi_ijk.rename(columns={'pi_ijk_x': 'pi_ijk', 'pi_ijk_y': 'pi_jjk'},
+              inplace=True)
+# ' Check $\pi_{ij}^k$ sum to one over in_country and out_ind
+pi_ijk.groupby(['in_country', 'out_ind'])['pi_ijk'].sum().describe()
+# Clean environment
+del pi_jjk
+
+# Matching wages to guarantee balanced trade
+lambda_ij = pi_ijk.merge(alpha_jk, on=jk_cols, how='left')
+lambda_ij['lambda_ij'] = lambda_ij['pi_ijk']*lambda_ij['alpha_jk']
+lambda_ij = (lambda_ij
+             .groupby(ij_cols, as_index=False)['lambda_ij']
+             .sum())
+# Creates the Lambda matrix
+Lambda_mat = lambda_ij.pivot(index='out_country',
+                             columns='in_country',
+                             values='lambda_ij')
+# Vector of gamma guesses
+n_countries = Lambda_mat.shape[0]
+gamma_old = pd.Series(np.ones(n_countries) / n_countries,
+                      index=Lambda_mat.index)
+# Iteration to find eigenvalue
+for i in range(1000):
+    gamma_new = Lambda_mat @ gamma_old
+    if max(abs(gamma_new - gamma_old)) < 1e-5:
+        break
+
+    gamma_old = gamma_new.copy()
+
+gamma_i = gamma_new.to_frame(name='gamma_i').reset_index()
+# Merge Socio-Economic data
+gamma_i = gamma_i.merge(employed, on='out_country', how='left')
+# Normalize USA wages to 1 and compute the world's wage bill \sum_i w_i L_i
+usa_idx = gamma_i['out_country'] == 'USA'
+wld_wage = gamma_i.loc[usa_idx, 'employed_i'] / gamma_i.loc[usa_idx, 'gamma_i']
+gamma_i['wage_i'] = (gamma_i['gamma_i'] * wld_wage.values
+                     / gamma_i['employed_i'])
+# Check gamma_i dataframe
+gamma_i
+# Merge everything back to trade_flows, the main database
+trade_flows = (trade_flows
+               .merge(alpha_jk, on=jk_cols, how='left')
+               .merge(pi_ijk, on=ijk_cols, how='left')
+               .merge(gamma_i, on=['out_country'], how='left')
+               .merge(gamma_i, left_on='in_country', right_on='out_country',
+                      how='left'))
+trade_flows.drop('out_country_y', axis=1, inplace=True)
+trade_flows.rename(columns={'out_country_x': 'out_country',
+                            'gamma_i_x': 'gamma_i',
+                            'employed_i_x': 'employed_i',
+                            'wage_i_x': 'wage_i',
+                            'gamma_i_y': 'gamma_j',
+                            'employed_i_y': 'employed_j',
+                            'wage_i_y': 'wage_j'},
+                   inplace=True)
+```
 
 ## References

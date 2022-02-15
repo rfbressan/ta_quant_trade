@@ -1,7 +1,7 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|iteration|parent|children|seconds|warnings|error
-useful|stem|1feb427b8c956f0f|c095d727016fcc58|4745aa592080ea1d|-777613625|01_useful.html*01_useful.Rmd|t19034.6203107694s|801c2e13a01d1e2f|98398|file|vector|||49.948|NAs introduzidos por coerção|
-tradecosts|stem|967c9ff9a62e159b|d5feb078f2177282|4745aa592080ea1d|-1250091143|04_tradecosts.html*04_tradecosts.Rmd|t19034.6203349341s|4fb6d50cde444476|88368|file|vector|||2.09||
-artuc|stem|cec236faefe91dbe|624d72a9c3974f20|4745aa592080ea1d|-1414518527|06_artuc.html*06_artuc.Rmd|t19034.6203497015s|de7c7b5ade24528f|136977|file|vector|||1.265||
-expenditures|stem|aefdfe6937dbcec2|edd41ec281e24e40|4745aa592080ea1d|-1430470646|03_expenditures.html*03_expenditures.Rmd|t19034.6203749773s|ece66648896bff41|100641|file|vector|||2.153||
-counterfactual|stem|85e3356315ff8a81|480de0c31937a65f|4745aa592080ea1d|-1985593958|05_counterfactual.html*05_counterfactual.Rmd|t19034.6203778012s|42df16fbe4da73df|77406|file|vector|||0.245||
-eatonkortum|stem|24d932dc94b79d38|c9738b2e08e8300a|4745aa592080ea1d|-525523067|02_eatonkortum.html*02_eatonkortum.Rmd|t19034.6204122892s|bcb7ffc5e24a5e4c|97875|file|vector|||2.956||
+artuc|stem|d9e0f36874e2ca68|624d72a9c3974f20|4745aa592080ea1d|-1414518527|06_artuc.html*06_artuc.Rmd|t19037.9836682741s|2beb3ed9def0efa1|135695|file|vector|||1.071||
+useful|stem|c6bf321aeea5d9e1|ec9b30daf4e0e3c0|4745aa592080ea1d|-777613625|01_useful.html*01_useful.Rmd|t19038.7429571149s|4910aba4f5775625|98603|file|vector|||62.648|NAs introduzidos por coerção|
+eatonkortum|stem|02e0ccd3fe07db30|b1af0d63e081a248|4eb81ae370b4299a|-525523067|02_eatonkortum.html*02_eatonkortum.Rmd|t19038.7430397985s|0e68818d6f417758|116212|file|vector|||7.045||
+expenditures|stem|bc7922d828f1c105|aed76343106f44bd|fd4574325c3cbbd6|-1430470646|03_expenditures.html*03_expenditures.Rmd|t19038.743091603s|a17a0565e93beb41|119179|file|vector|||4.477||
+tradecosts|stem|68765f69bca20807|c770a44281830b07|ceb74345d0e3c79a|-1250091143|04_tradecosts.html*04_tradecosts.Rmd|t19038.7431259542s|2a8141fcd9e62ba9|97261|file|vector|||2.957||
+counterfactual|stem|b6b998b70508862e|94d61d88212f5abd|03dd76a3128335ae|-1985593958|05_counterfactual.html*05_counterfactual.Rmd|t19038.7431335004s|9dc40ff6a5d3fc31|77474|file|vector|||0.617||

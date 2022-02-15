@@ -22,6 +22,10 @@ MathJax.Hub.Config({
 });
 </script>
 
+```{r sequential, include=FALSE}
+targets::tar_read(tradecosts)
+```
+
 ## Counterfactual analysis
 
 Now that we have implemented and calibrated the model, we are able to attain our second objective, find the welfare changes from counterfactual scenarios. But let's first define our welfare metric.

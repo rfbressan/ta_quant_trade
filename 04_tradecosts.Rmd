@@ -22,6 +22,10 @@ MathJax.Hub.Config({
 });
 </script>
 
+```{r sequential, include=FALSE}
+targets::tar_read(expenditures)
+```
+
 ## Calibration - _continued_
 
 ```{r loading}
@@ -75,7 +79,7 @@ and inverting this relation for $d_{ij}^k$ we have:
 
 $$
 \begin{equation}
-  d_{ij}^k=\frac{\left(\delta_{ij}^k\right)^{-1/\theta}}{w_i/w_j}\cdot z_i/z_j
+  d_{ij}^k=\frac{\left(\delta_{ij}^k\right)^{-1/\theta}}{w_i/w_j}\cdot z_i^k/z_j^k
 \end{equation}
 $$
 
@@ -108,5 +112,44 @@ trade_flows[, .(cor(pred_pi, pi_ijk, use = "complete"))]
 
 As you can see above, there are some invalid values for $\hat\pi_{ij}^k$ (i.e. `NaN` or `Inf`). This is due to the fact that some countries do not trade to each other, hence, a few $x_{ij}^{kl}$ trade flows are zero and this may lead to either $\pi_{ij}^k=0$ or $\pi_{jj}^k=0$. **I will leave it to you to figure out how this can be a problem and a way get around it!**
 
+## Python code
+
+```{python tradecosts, eval=FALSE}
+# Computing trading costs
+trade_flows = (trade_flows
+               .assign(delta_ijk=lambda x: x['pi_ijk'] / x['pi_jjk'],
+                       z_ratio_ijk=lambda x: x['z_ik'] / x['z_jk'],
+                       w_ratio_ij=lambda x: x['wage_i'] / x['wage_j'])
+               )
+trade_flows = (trade_flows
+               .assign(d_ijk=lambda x: x['delta_ijk']**(-1/theta)*x['z_ratio_ijk']/x['w_ratio_ij']))
+# Insert predicted trade flows and shares into trade_flows
+df = trade_flows[['in_country', 'out_ind', 'wage_i', 'd_ijk', 'z_ik']]
+df['Phi_jk'] = (df['wage_i']*df['d_ijk'] / df['z_ik'])**(-theta)
+df = df.groupby(['in_country', 'out_ind'], as_index=False)['Phi_jk'].agg(sum)
+trade_flows = trade_flows.merge(df, on=['in_country', 'out_ind'], how='left')
+
+# Auxilary functions
+
+
+def pred_value(df):
+    return (((df['wage_i']*df['d_ijk'] / df['z_ik'])**(-theta))/df['Phi_jk'])*df['alpha_jk']*df['wage_j']*df['employed_j']
+
+
+def pred_pi(df):
+    return ((df['wage_i']*df['d_ijk'] / df['z_ik'])**(-theta))/df['Phi_jk']
+
+
+trade_flows['pred_value'] = pred_value(trade_flows)
+trade_flows['pred_pi'] = pred_pi(trade_flows)
+
+# Check pred_pi sums to one
+trade_flows.groupby(['in_country', 'out_ind'])['pred_pi'].sum()
+# predicted pi equals actual pi
+trade_flows[ijk_cols + ['pred_pi', 'pi_ijk']].sample(20)
+# Correlations
+trade_flows[['pred_pi', 'pi_ijk']].corr()
+trade_flows[['pred_value', 'value']].corr()
+```
 
 ## References

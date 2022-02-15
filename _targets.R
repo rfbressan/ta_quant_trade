@@ -17,7 +17,7 @@ library(tarchetypes)
 
 # End this file with a list of target objects.
 list(
-  tar_render(useful, "01_useful.Rmd"),
+  tar_render(useful, "01_useful.Rmd", params = list(floor_bool = FALSE)),
   tar_render(eatonkortum, "02_eatonkortum.Rmd"),
   tar_render(expenditures, "03_expenditures.Rmd"),
   tar_render(tradecosts, "04_tradecosts.Rmd"),
