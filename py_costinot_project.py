@@ -1,11 +1,13 @@
 # Python code for Costinot et al project
 
-from math import gamma
 import numpy as np
 import pandas as pd
-from sympy import Lambda
 
 wiot = pd.read_csv("output/wiot.csv").drop(columns='Unnamed: 0')
+# Flooring values lower than one. Cheap trick to avoid division by zero
+# further down
+wiot.loc[wiot['value'] < 1.0, 'value'] = 1.0
+
 
 wiod_sea = pd.read_excel("input/WIOD_SEA_Nov16.xlsx",
                          sheet_name="DATA",
@@ -19,7 +21,7 @@ employed = (wiod_sea
 row = pd.DataFrame({'out_country': ['ROW'],
                     'employed_i': [employed['employed_i'].sum()]})
 employed = employed.append(row)
-employed.to_csv("output/employed.csv", index=False)
+# employed.to_csv("output/employed.csv", index=False)
 
 # Starting calibration
 theta = 6.534
@@ -27,17 +29,21 @@ theta = 6.534
 trade_flows = wiot.copy()  # Just to keep names the same as in R code
 # Helps in cleaner code
 ijk_cols = ['out_country', 'in_country', 'out_ind']
+ij_cols = ['out_country', 'in_country']
+ik_cols = ['out_country', 'out_ind']
+jk_cols = ['in_country', 'out_ind']
+
 trade_flows = (trade_flows
                .groupby(ijk_cols, as_index=False)[['value']]
                .sum()
                )
 trade_flows['log1_value'] = np.log(trade_flows['value'] + 1)
-trade_flows['delta_ij'] = trade_flows['out_country'] + \
-    '_' + trade_flows['in_country']
-trade_flows['delta_jk'] = trade_flows['in_country'] + \
-    '_' + trade_flows['out_ind'].astype(str)
-trade_flows['delta_ik'] = trade_flows['out_country'] + \
-    '_' + trade_flows['out_ind'].astype(str)
+# trade_flows['delta_ij'] = trade_flows['out_country'] + \
+#     '_' + trade_flows['in_country']
+# trade_flows['delta_jk'] = trade_flows['in_country'] + \
+#     '_' + trade_flows['out_ind'].astype(str)
+# trade_flows['delta_ik'] = trade_flows['out_country'] + \
+#     '_' + trade_flows['out_ind'].astype(str)
 
 # Run a fixed-effect regression to extract the revealed productivities
 # This takes 1 minute and crashes
@@ -65,19 +71,19 @@ trade_flows['delta_ik'] = trade_flows['out_country'] + \
 z_ik = pd.read_csv("output/z_ik.csv")
 z_ik['z_ik'] = np.exp(z_ik['fe']/theta)
 z_ik['out_country'] = z_ik['delta_ik'].str.split('_').apply(lambda x: x[0])
-z_ik['out_ind'] = z_ik['delta_ik'].str.split(
-    '_').apply(lambda x: x[1]).astype('int64')
+z_ik['out_ind'] = (z_ik['delta_ik'].str.split('_').apply(lambda x: x[1])
+                   .astype('int64'))
 # Merge back into trade_flows as this is our main dataset. Both z_ik and z_jk
 trade_flows = trade_flows.merge(z_ik[['out_country', 'out_ind', 'z_ik']],
                                 how='left',
-                                left_on=['in_country', 'out_ind'],
-                                right_on=['out_country', 'out_ind'])
+                                left_on=jk_cols,
+                                right_on=ik_cols)
 trade_flows.rename(columns={'z_ik': 'z_jk', 'out_country_x': 'out_country'},
                    inplace=True)
+trade_flows.drop('out_country_y', axis=1, inplace=True)
 trade_flows = trade_flows.merge(z_ik[['out_country', 'out_ind', 'z_ik']],
                                 how='left',
-                                on=['out_country', 'out_ind'])
-trade_flows.drop('out_country_y', axis=1, inplace=True)
+                                on=ik_cols)
 # share of expenditures in k industry for in_country j. This must be computed
 # from in_ind!! It's the industry k where the importer country is spending
 alpha_jk = (wiot
@@ -90,7 +96,7 @@ alpha_jk.drop('value', axis=1, inplace=True)
 # Compatibilize industry name with the rest of data
 alpha_jk.rename(columns={'in_ind': 'out_ind'}, inplace=True)
 # Check alphas sum to one
-alpha_jk.groupby('in_country')['alpha_jk'].sum()
+alpha_jk.groupby('in_country')['alpha_jk'].sum().describe()
 
 # Estimating pi_ijk
 pi_ijk = trade_flows[['in_country', 'out_ind', 'out_country']]
@@ -105,15 +111,15 @@ pi_ijk = pi_ijk.merge(pi_jjk.drop('out_country', axis=1),
 pi_ijk.rename(columns={'pi_ijk_x': 'pi_ijk', 'pi_ijk_y': 'pi_jjk'},
               inplace=True)
 # ' Check $\pi_{ij}^k$ sum to one over in_country and out_ind
-pi_ijk.groupby(['in_country', 'out_ind'])['pi_ijk'].sum()
+pi_ijk.groupby(['in_country', 'out_ind'])['pi_ijk'].sum().describe()
 # Clean environment
 del pi_jjk
 
 # Matching wages to guarantee balanced trade
-lambda_ij = pi_ijk.merge(alpha_jk, on=['in_country', 'out_ind'], how='left')
+lambda_ij = pi_ijk.merge(alpha_jk, on=jk_cols, how='left')
 lambda_ij['lambda_ij'] = lambda_ij['pi_ijk']*lambda_ij['alpha_jk']
 lambda_ij = (lambda_ij
-             .groupby(['out_country', 'in_country'], as_index=False)['lambda_ij']
+             .groupby(ij_cols, as_index=False)['lambda_ij']
              .sum())
 # Creates the Lambda matrix
 Lambda_mat = lambda_ij.pivot(index='out_country',
@@ -139,10 +145,12 @@ usa_idx = gamma_i['out_country'] == 'USA'
 wld_wage = gamma_i.loc[usa_idx, 'employed_i'] / gamma_i.loc[usa_idx, 'gamma_i']
 gamma_i['wage_i'] = (gamma_i['gamma_i'] * wld_wage.values
                      / gamma_i['employed_i'])
+# Check gamma_i dataframe
+gamma_i
 # Merge everything back to trade_flows, the main database
 trade_flows = (trade_flows
-               .merge(alpha_jk, on=['in_country', 'out_ind'], how='left')
-               .merge(pi_ijk, on=['out_country', 'in_country', 'out_ind'], how='left')
+               .merge(alpha_jk, on=jk_cols, how='left')
+               .merge(pi_ijk, on=ijk_cols, how='left')
                .merge(gamma_i, on=['out_country'], how='left')
                .merge(gamma_i, left_on='in_country', right_on='out_country',
                       how='left'))
@@ -156,4 +164,40 @@ trade_flows.rename(columns={'out_country_x': 'out_country',
                             'wage_i_y': 'wage_j'},
                    inplace=True)
 # Clean environment
-del alpha_jk, pi_ijk, gamma_i, gamma_old, gamma_new, Lambda_mat, lambda_ij, usa_idx, row
+# del alpha_jk, pi_ijk, gamma_i, gamma_old, gamma_new, Lambda_mat, lambda_ij, usa_idx, row, usa_idx, z_ik
+
+# Computing trading costs
+trade_flows = (trade_flows
+               .assign(delta_ijk=lambda x: x['pi_ijk'] / x['pi_jjk'],
+                       z_ratio_ijk=lambda x: x['z_ik'] / x['z_jk'],
+                       w_ratio_ij=lambda x: x['wage_i'] / x['wage_j'])
+               )
+trade_flows = (trade_flows
+               .assign(d_ijk=lambda x: x['delta_ijk']**(-1/theta)*x['z_ratio_ijk']/x['w_ratio_ij']))
+# Insert predicted trade flows and shares into trade_flows
+df = trade_flows[['in_country', 'out_ind', 'wage_i', 'd_ijk', 'z_ik']]
+df['Phi_jk'] = (df['wage_i']*df['d_ijk'] / df['z_ik'])**(-theta)
+df = df.groupby(['in_country', 'out_ind'], as_index=False)['Phi_jk'].agg(sum)
+trade_flows = trade_flows.merge(df, on=['in_country', 'out_ind'], how='left')
+
+# Auxilary functions
+
+
+def pred_value(df):
+    return (((df['wage_i']*df['d_ijk'] / df['z_ik'])**(-theta))/df['Phi_jk'])*df['alpha_jk']*df['wage_j']*df['employed_j']
+
+
+def pred_pi(df):
+    return ((df['wage_i']*df['d_ijk'] / df['z_ik'])**(-theta))/df['Phi_jk']
+
+
+trade_flows['pred_value'] = pred_value(trade_flows)
+trade_flows['pred_pi'] = pred_pi(trade_flows)
+
+# Check pred_pi sums to one
+trade_flows.groupby(['in_country', 'out_ind'])['pred_pi'].sum()
+# predicted pi equals actual pi
+trade_flows[ijk_cols + ['pred_pi', 'pi_ijk']].sample(20)
+# Correlations
+trade_flows[['pred_pi', 'pi_ijk']].corr()
+trade_flows[['pred_value', 'value']].corr()
