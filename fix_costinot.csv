@@ -1,0 +1,9 @@
+out_country,in_country,out_ind,value
+AUS         ,AUS        ,1,10
+AUS         ,AUS        ,2,5
+AUS         ,AUT,1,0
+AUS         ,AUT,2,0.5
+AUT,AUT,1,20
+AUT,AUT,2,0
+AUT,AUS        ,1,10
+AUT,AUS        ,2,0.8
