@@ -32,3 +32,4 @@ input
 output
 .Rprofile
 __pycache__/test_costinot.cpython-39-pytest-7.0.0.pyc
+__pycache__

@@ -145,28 +145,59 @@ class EconomiaArtuc:
     #Função Omega no paper
     def Omega(self, mu):
         """Valor da opção do trabalhador
+        
+        Complete a função de acordo com o artigo ACM2008.
 
         :param mu: moving cost
         :type mu: float
         :return: value
         :rtype: float
         """
-        return self.nu*np.log(1 + np.exp(mu/self.nu))
+        pass
     
     #CDF da distribuição logística (diferença dos choques)
     def G(self, mu):
-        if mu == np.Inf:
-            return 1.0
-        else:
-            return np.exp(mu/self.nu)/(1 + np.exp(mu/self.nu))
+        """CDF da distribuição logística
+        
+        Complete a função de acordo com o artigo ACM2008. A função deve retornar
+        valores válidos para valores extremos de mu (e.g., np.Inf)
+        
+        :param mu: moving cost
+        :type mu: float
+        :return: value
+        :rtype: float
+        """
+        pass
     
     #Condição de primeira ordem para maximização dos lucros
     def FOC(self, L, K, p):
-        return p*self.alpha*((L)**(self.alpha-1))*((K)**(1-self.alpha))
-    
+        """Condição de primeira ordem para maximização dos lucros
+        
+        Complete a função de acordo com o artigo ACM2008.
+        
+        :param L: Labor force
+        :type L: float
+        :param K: Capital
+        :type K: float
+        :param p: relative price
+        :type p: float
+        :return: value
+        :rtype: float
+        """
+        pass
+      
     #Indice de preços
     def phi(self,p):
-        return p**(.5)
+        """Indice de preços
+        
+        Complete a função de acordo com o artigo ACM2008.
+        
+        :param p: relative price
+        :type p: float
+        :return: value
+        :rtype: float
+        """
+        pass
     
     #Retorna as equações necessárias para calcular steady-state
     #vec_guess - valores, salários e thresholds (vetor)

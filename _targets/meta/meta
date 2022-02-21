@@ -1,7 +1,7 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|iteration|parent|children|seconds|warnings|error
-artuc|stem|d9e0f36874e2ca68|624d72a9c3974f20|4745aa592080ea1d|-1414518527|06_artuc.html*06_artuc.Rmd|t19037.9836682741s|2beb3ed9def0efa1|135695|file|vector|||1.071||
 useful|stem|c6bf321aeea5d9e1|ec9b30daf4e0e3c0|4745aa592080ea1d|-777613625|01_useful.html*01_useful.Rmd|t19038.7429571149s|4910aba4f5775625|98603|file|vector|||62.648|NAs introduzidos por coerção|
 eatonkortum|stem|02e0ccd3fe07db30|b1af0d63e081a248|4eb81ae370b4299a|-525523067|02_eatonkortum.html*02_eatonkortum.Rmd|t19038.7430397985s|0e68818d6f417758|116212|file|vector|||7.045||
 expenditures|stem|bc7922d828f1c105|aed76343106f44bd|fd4574325c3cbbd6|-1430470646|03_expenditures.html*03_expenditures.Rmd|t19038.743091603s|a17a0565e93beb41|119179|file|vector|||4.477||
 tradecosts|stem|68765f69bca20807|c770a44281830b07|ceb74345d0e3c79a|-1250091143|04_tradecosts.html*04_tradecosts.Rmd|t19038.7431259542s|2a8141fcd9e62ba9|97261|file|vector|||2.957||
 counterfactual|stem|b6b998b70508862e|94d61d88212f5abd|03dd76a3128335ae|-1985593958|05_counterfactual.html*05_counterfactual.Rmd|t19038.7431335004s|9dc40ff6a5d3fc31|77474|file|vector|||0.617||
+artuc|stem|77a766a3078cfa7e|624d72a9c3974f20|4745aa592080ea1d|-1414518527|06_artuc.html*06_artuc.Rmd|t19044.9949991162s|563c2ba2d23ffd54|139893|file|vector|||3.301||
