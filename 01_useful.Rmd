@@ -11,7 +11,7 @@ output:
 bibliography: "references.bib"
 link-citations: yes
 params:
-  floor_bool: true
+  floor_bool: false
 ---
 
 <script type="text/x-mathjax-config">
@@ -128,23 +128,30 @@ library(fst)
 
 load("input/WIOT2014_October16_ROW.RData")
 
-setnames(wiot, 
-         c("IndustryCode", "IndustryDescription", "Country", "RNr"),
-         c("ind_code", "ind_name", "out_country", "out_ind"))
+setnames(
+  wiot,
+  c("IndustryCode", "IndustryDescription", "Country", "RNr"),
+  c("ind_code", "ind_name", "out_country", "out_ind")
+)
 wiot[sample(5), .(ind_code, out_country, out_ind, AUS1, BRA4)]
 ```
 
 ```{r, warning=FALSE}
 id_vars <- c("out_country", "out_ind")
-wiot <- melt(wiot[, -c("ind_code", "ind_name", "Year")], 
-             id.vars = id_vars,
-             variable.name = "in_country",
-             variable.factor = FALSE)
-wiot[, `:=`(in_ind = sub("[[:alpha:]]+(\\d+)", "\\1", in_country),
-            in_country = sub("([[:alpha:]]+)\\d+", "\\1", in_country))]
+wiot <- melt(wiot[, -c("ind_code", "ind_name", "Year")],
+  id.vars = id_vars,
+  variable.name = "in_country",
+  variable.factor = FALSE
+)
+wiot[, `:=`(
+  in_ind = sub("[[:alpha:]]+(\\d+)", "\\1", in_country),
+  in_country = sub("([[:alpha:]]+)\\d+", "\\1", in_country)
+)]
 wiot[, in_ind := as.integer(in_ind)]
-setcolorder(wiot,
-            c("out_country", "out_ind", "in_country", "in_ind", "value"))
+setcolorder(
+  wiot,
+  c("out_country", "out_ind", "in_country", "in_ind", "value")
+)
 wiot[sample(5), 1:5]
 ```
 
@@ -158,10 +165,10 @@ From previous data analysis (not shown here), we also know that industry #56 - A
 
 ```{r}
 #' Drop industry U (56) since most countries do not expend anything on this
-wiot <- wiot[!(out_country %chin% c("TOT") 
-               | in_country %chin% c("TOT")
-               | out_ind > 55
-               | in_ind > 55)]
+wiot <- wiot[!(out_country %chin% c("TOT") |
+  in_country %chin% c("TOT") |
+  out_ind > 55 |
+  in_ind > 55)]
 ```
 
 ```{r floor, echo=FALSE, eval=params$floor_bool}
@@ -182,13 +189,18 @@ Now we must get socio-economic data from this [link](https://dataverse.nl/api/ac
 ```{r sea}
 library(openxlsx)
 wiod_sea <- as.data.table(
-  read.xlsx("input/WIOD_SEA_Nov16.xlsx", sheet = "DATA"))
+  read.xlsx("input/WIOD_SEA_Nov16.xlsx", sheet = "DATA")
+)
 #' Employed population in thousands
-employed <- wiod_sea[variable == "EMP", by = "country",
-                     .(employed = sum(`2014`))]
-setnames(employed, 
-         c("country", "employed"), 
-         c("out_country", "employed_i"))
+employed <- wiod_sea[variable == "EMP",
+  by = "country",
+  .(employed = sum(`2014`))
+]
+setnames(
+  employed,
+  c("country", "employed"),
+  c("out_country", "employed_i")
+)
 #' ATTENTION: socio-economic data from WIOD does not include ROW! I will just
 #' input the employed in ROW having the same value as the sum of all countries!
 employed <- rbind(employed, list("ROW", employed[, sum(employed_i)]))
